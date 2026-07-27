@@ -59,6 +59,8 @@ impl FromStr for TileType {
 
 #[derive(Debug, Clone)]
 pub struct Tile {
+    pub x: usize,
+    pub y: usize,
     /// State
     pub state: TileState,
     /// Type of tile

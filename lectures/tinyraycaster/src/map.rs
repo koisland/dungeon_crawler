@@ -1,13 +1,15 @@
 use eyre::bail;
+use itertools::Itertools;
 
 use std::{
     collections::{BTreeMap, HashMap},
     fs::File,
     io::{BufRead, BufReader},
+    str::FromStr,
 };
 
 use crate::{
-    enemy::Enemy,
+    enemy::{Enemy, EnemyState, EnemyType},
     tiles::{Tile, TileState, TileType},
 };
 
@@ -49,6 +51,8 @@ impl Map {
                     continue;
                 };
                 let tile = Tile {
+                    x,
+                    y: h,
                     state: TileState::Base,
                     typ: tile_typ,
                 };
@@ -74,6 +78,59 @@ impl Map {
         Ok(map)
     }
 
+    pub fn with_state(&mut self, infile: &str) -> eyre::Result<()> {
+        let fh = BufReader::new(File::open(infile)?);
+
+        for line in fh.lines() {
+            let line = line?;
+            if line.starts_with('#') {
+                continue;
+            }
+            let Some((typ, lbl, state, x, y, angle)) = line.trim().split('\t').collect_tuple()
+            else {
+                bail!("Invalid format for state for {line}")
+            };
+            let x = x.parse::<f32>()?;
+            let y = y.parse::<f32>()?;
+            let angle = (!angle.is_empty())
+                .then(|| angle.parse::<f32>())
+                .transpose()?
+                .unwrap_or_default();
+
+            match typ {
+                "enemy" => {
+                    let etyp = EnemyType::from_str(lbl)?;
+                    let state = EnemyState::from_str(state)?;
+
+                    let enemy = Enemy {
+                        x,
+                        y,
+                        _angle: angle,
+                        state,
+                        typ: etyp,
+                    };
+                    self.spawn_enemy(enemy);
+                }
+                "tile" => {
+                    let tiletype = TileType::from_str(lbl)?;
+                    let state = TileState::from_str(state)?;
+
+                    let tile = Tile {
+                        x: x as usize,
+                        y: y as usize,
+                        state,
+                        typ: tiletype,
+                    };
+
+                    self.spawn_tile(tile);
+                }
+                _ => bail!("Invalid type {typ} for {line}"),
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn tile(&self, x: usize, y: usize) -> Option<&Tile> {
         self.tile_pos_id_map
             .get(&(x, y))
@@ -82,6 +139,12 @@ impl Map {
 
     pub fn tiles(&self) -> impl Iterator<Item = (usize, usize, Option<&Tile>)> {
         (0..self.h).flat_map(move |y| (0..self.w).map(move |x| (x, y, self.tile(x, y))))
+    }
+
+    pub fn spawn_tile(&mut self, tile: Tile) {
+        let tid = self.id_tile_map.len();
+        self.tile_pos_id_map.insert((tile.x, tile.y), tid);
+        self.id_tile_map.insert(tid, tile);
     }
 
     pub fn spawn_enemy(&mut self, enemy: Enemy) {

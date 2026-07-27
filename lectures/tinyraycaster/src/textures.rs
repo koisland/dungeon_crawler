@@ -45,14 +45,6 @@ pub struct Textures {
 }
 
 impl Textures {
-    pub fn new(size: usize) -> Self {
-        Textures {
-            size,
-            tiles: HashMap::new(),
-            entities: HashMap::new(),
-        }
-    }
-
     pub fn get_enemy(&self, enemy: &Enemy) -> Option<&Texture> {
         self.entities
             .get(&enemy.typ)
@@ -65,7 +57,12 @@ impl Textures {
             .and_then(|tilestates| tilestates.get(&tile.state))
     }
 
-    pub fn load(&mut self, infile: &str) -> eyre::Result<()> {
+    pub fn new(infile: &str, size: usize) -> eyre::Result<Self> {
+        let mut textures = Textures {
+            size,
+            tiles: HashMap::new(),
+            entities: HashMap::new(),
+        };
         let fh = BufReader::new(File::open(infile)?);
         let mut texture_cache = HashMap::new();
 
@@ -107,15 +104,15 @@ impl Textures {
                 let idx: usize = idx.parse()?;
 
                 // Assuming square.
-                let ncols = w / self.size;
+                let ncols = w / textures.size;
                 // Convert idx to pixel coordinates
                 let div = idx / ncols;
                 let rem = idx % ncols;
-                let x = (rem * self.size) as u32;
-                let y = (div * self.size) as u32;
+                let x = (rem * textures.size) as u32;
+                let y = (div * textures.size) as u32;
                 // Then slice image out of sprite sheet
                 let img_slice = img
-                    .view(x, y, self.size as u32, self.size as u32)
+                    .view(x, y, textures.size as u32, textures.size as u32)
                     .to_image();
                 Texture::Sprite(DynamicImage::ImageRgba8(img_slice))
             };
@@ -125,20 +122,22 @@ impl Textures {
                     let tiletype: TileType = TileType::from_str(lbl)?;
                     let texture_state = TileState::from_str(state)?;
 
-                    if let Some(tile_src) = self.tiles.get_mut(&tiletype) {
+                    if let Some(tile_src) = textures.tiles.get_mut(&tiletype) {
                         tile_src.insert(texture_state, texture);
                     } else {
-                        self.tiles
+                        textures
+                            .tiles
                             .insert(tiletype, HashMap::from_iter([(texture_state, texture)]));
                     }
                 }
                 "enemy" => {
                     let enemy: EnemyType = EnemyType::from_str(lbl)?;
                     let texture_state = EnemyState::from_str(state)?;
-                    if let Some(ety_src) = self.entities.get_mut(&enemy) {
+                    if let Some(ety_src) = textures.entities.get_mut(&enemy) {
                         ety_src.insert(texture_state, texture);
                     } else {
-                        self.entities
+                        textures
+                            .entities
                             .insert(enemy, HashMap::from_iter([(texture_state, texture)]));
                     }
                 }
@@ -146,6 +145,6 @@ impl Textures {
             };
         }
 
-        Ok(())
+        Ok(textures)
     }
 }
