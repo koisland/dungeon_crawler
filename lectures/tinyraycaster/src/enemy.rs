@@ -2,6 +2,8 @@ use std::str::FromStr;
 
 use eyre::bail;
 
+use crate::player::Player;
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum EnemyType {
     RedBlob,
@@ -66,4 +68,11 @@ pub struct Enemy {
     /// texture id on sprite sheet
     #[allow(unused)]
     pub typ: EnemyType,
+}
+
+impl Enemy {
+    pub fn dst_from_player(&self, player: &Player) -> f32 {
+        // pythagorean theorem
+        ((player.x - self.x).powi(2) + (player.y - self.y).powi(2)).sqrt()
+    }
 }

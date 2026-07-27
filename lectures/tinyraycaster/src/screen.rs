@@ -7,6 +7,7 @@ use std::{
 
 use eyre::bail;
 use image::{DynamicImage, GenericImageView};
+use itertools::Itertools;
 
 use crate::{
     color::Color,
@@ -179,8 +180,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
             angle += 2. * PI;
         }
 
-        // pythagorean theorem
-        let sprite_dst = ((player.x - enemy.x).powi(2) + (player.y - enemy.y).powi(2)).sqrt();
+        let sprite_dst = enemy.dst_from_player(player);
         let Some(texture) = textures.get_enemy(enemy) else {
             bail!("No texture for enemy {enemy:?}")
         };
@@ -237,7 +237,17 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         map: &Map,
         textures: &Textures,
     ) -> eyre::Result<()> {
-        for entity in map.id_enemy_map.values() {
+        // Brute-force draw enemies from farthest to closest
+        for entity in map
+            .id_enemy_map
+            .values()
+            .sorted_by(|a, b| {
+                let dst_a = a.dst_from_player(player);
+                let dst_b = b.dst_from_player(player);
+                dst_a.total_cmp(&dst_b)
+            })
+            .rev()
+        {
             self.draw_sprite(entity, player, textures)?;
         }
         Ok(())
