@@ -27,6 +27,6 @@ async fn main() -> eyre::Result<()> {
 
         let texture = Texture2D::from_image(screen.buffer());
         draw_texture(&texture, 0., 0., WHITE);
-        next_frame().await
+        next_frame().await;
     }
 }

@@ -62,9 +62,10 @@ impl GameState {
                     let enemy = Enemy {
                         x,
                         y,
-                        _angle: angle,
+                        angle,
                         state,
                         typ: etyp,
+                        dst: 0.0,
                     };
                     game_state.spawn_enemy(enemy);
                 }
@@ -85,6 +86,9 @@ impl GameState {
             }
         }
 
+        for enemy in game_state.id_enemy_map.values_mut() {
+            enemy.dst = enemy.dst_from_player(&game_state.player);
+        }
         Ok(game_state)
     }
 

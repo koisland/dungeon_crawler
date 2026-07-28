@@ -204,10 +204,8 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         // https://www.youtube.com/watch?v=VMYk9fqXz_4
         // https://stackoverflow.com/questions/283406/what-is-the-difference-between-atan-and-atan2-in-c
         // Use atan2 incase where x is negative. Allows getting angle with range across all 4 quadrants as opposed to 2 (1 and 4).
-        let dst_y = enemy.y - player.y;
-        let dst_x = enemy.x - player.x;
         // Angle of enemy relative to player
-        let mut angle = dst_y.atan2(dst_x);
+        let mut angle = (enemy.y - player.y).atan2(enemy.x - player.x);
         while angle - player.ang > PI {
             angle -= 2. * PI;
         } // remove unncesessary periods from the relative direction
@@ -215,37 +213,31 @@ impl<const W: usize, const H: usize> Screen<W, H> {
             angle += 2. * PI;
         }
 
-        let sprite_dst = enemy.dst_from_player(player);
         let Some(texture) = textures.get_enemy(enemy) else {
             bail!("No texture for enemy {enemy:?}")
         };
         // Scale sprite by distance from player and clamp to 2000 if very close.
-        let sprite_screen_size = ((H as f32 / sprite_dst) as usize).min(1000);
-        let hscreen_width = W / 2;
-        let hscreen_height = H / 2;
-        let hsprite_screen_size = sprite_screen_size / 2;
-
-        // Get the upper left corner of the sprite
-        // TODO: Huh? Unclear why this works.
-        let h_offset_pt1 = (angle - player.ang) / player.fov * hscreen_width as f32;
-        let h_offset_pt2 = (hscreen_width / 2 - textures.size / 2) as f32;
-        let h_offset = (h_offset_pt1 + h_offset_pt2) as usize;
-        let v_offset = hscreen_height - hsprite_screen_size;
+        let sprite_screen_size = ((H as f32 / enemy.dst) as usize).min(2000);
+        let h_offset = ((angle - player.ang) * (W / 2) as f32 / (player.fov) + (W / 2) as f32 / 2.
+            - sprite_screen_size as f32 / 2.) as i32; // do not forget the 3D view takes only a half of the framebuffer, thus fb.w/2 for the screen width
+        let v_offset = (H / 2 - sprite_screen_size / 2) as i32;
 
         for i in 0..sprite_screen_size {
-            let px_x = h_offset + i;
+            let i_int = i as i32;
+            let px_x = h_offset + i_int;
             // Don't draw horizontal pixel if OOB
-            if px_x >= hscreen_width {
+            if px_x < 0 || px_x >= W as i32 / 2 {
                 continue;
             }
             // Occluded. Pixel at x-pos in front of sprite (closer).
-            if self.depth_buffer[px_x] < sprite_dst {
+            if TryInto::<usize>::try_into(px_x).is_ok_and(|x| self.depth_buffer[x] < enemy.dst) {
                 continue;
             }
 
             for j in 0..sprite_screen_size {
-                let px_y = v_offset + j;
-                if px_y >= H {
+                let j_int = j as i32;
+                let px_y = v_offset + j_int;
+                if px_y < 0 || px_y >= H as i32 {
                     continue;
                 }
                 let Some(color) = texture.get_color(
@@ -258,7 +250,8 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 // Only draw opaque pixels
                 // https://colorlabs.net/posts/what-are-alpha-channels-in-digital-images
                 if color.a > 0.5 {
-                    let px_x = hscreen_width + px_x;
+                    let px_x = (W / 2) + px_x as usize;
+                    let px_y = px_y as usize;
                     self.draw_pixel(px_x, px_y, color)?;
                 }
             }
@@ -334,7 +327,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 px_y as usize,
                 1,
                 1,
-                Color::from_rgba(160, 160, 160, 0),
+                Color::from_rgba(190, 190, 190, 128),
             )?;
 
             // Out of bounds or hit an object
