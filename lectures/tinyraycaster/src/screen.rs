@@ -14,8 +14,8 @@ use macroquad::{
 
 use crate::{
     enemy::Enemy,
-    map::Map,
     player::Player,
+    state::GameState,
     textures::{Texture, Textures},
 };
 
@@ -139,17 +139,12 @@ impl<const W: usize, const H: usize> Screen<W, H> {
     }
 
     // TODO: Maybe move to Map.
-    pub fn draw_map(
-        &mut self,
-        player: &Player,
-        map: &Map,
-        textures: &Textures,
-    ) -> eyre::Result<()> {
-        let rect_w = W / (map.w * 2);
-        let rect_h = H / map.h;
+    pub fn draw_map(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
+        let rect_w = W / (gs.map.w * 2);
+        let rect_h = H / gs.map.h;
         // eprintln!("Rects (w: {rect_w}, h: {rect_h})");
 
-        for (x, y, tile) in map.tiles() {
+        for (x, y, tile) in gs.get_tiles() {
             if let Some(tile) = tile {
                 // Because each rect is w and h
                 let rect_x = x * rect_w;
@@ -172,27 +167,27 @@ impl<const W: usize, const H: usize> Screen<W, H> {
             }
             continue;
         }
-        self.draw_player_on_map(player, map)?;
-        self.draw_entities_on_map(map)?;
+        self.draw_player_on_map(gs)?;
+        self.draw_entities_on_map(gs)?;
         Ok(())
     }
 
     // TODO: Refactor draw_* to take a struct that implents and Entity trait
-    pub fn draw_player_on_map(&mut self, player: &Player, map: &Map) -> eyre::Result<()> {
-        let rect_w = W / (map.w * 2);
-        let rect_h = H / map.h;
+    pub fn draw_player_on_map(&mut self, gs: &GameState) -> eyre::Result<()> {
+        let rect_w = W / (gs.map.w * 2);
+        let rect_h = H / gs.map.h;
         // Convert from coordinates to image dim
-        let x = (player.x * rect_w as f32) as usize;
-        let y = (player.y * rect_h as f32) as usize;
+        let x = (gs.player.x * rect_w as f32) as usize;
+        let y = (gs.player.y * rect_h as f32) as usize;
         self.draw_rect(x, y, 5, 5, Color::from_rgba(0, 0, 0, 0))?;
         Ok(())
     }
 
-    pub fn draw_entities_on_map(&mut self, map: &Map) -> eyre::Result<()> {
-        let rect_w = W / (map.w * 2);
-        let rect_h = H / map.h;
+    pub fn draw_entities_on_map(&mut self, gs: &GameState) -> eyre::Result<()> {
+        let rect_w = W / (gs.map.w * 2);
+        let rect_h = H / gs.map.h;
 
-        for entity in map.id_enemy_map.values() {
+        for entity in gs.id_enemy_map.values() {
             let x = (entity.x * rect_w as f32) as usize;
             let y = (entity.y * rect_h as f32) as usize;
             self.draw_rect(x, y, 5, 5, Color::from_rgba(255, 0, 0, 0))?;
@@ -271,24 +266,19 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         Ok(())
     }
 
-    pub fn draw_sprites(
-        &mut self,
-        player: &Player,
-        map: &Map,
-        textures: &Textures,
-    ) -> eyre::Result<()> {
+    pub fn draw_sprites(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
         // Brute-force draw enemies from farthest to closest
-        for entity in map
+        for entity in gs
             .id_enemy_map
             .values()
             .sorted_by(|a, b| {
-                let dst_a = a.dst_from_player(player);
-                let dst_b = b.dst_from_player(player);
+                let dst_a = a.dst_from_player(&gs.player);
+                let dst_b = b.dst_from_player(&gs.player);
                 dst_a.total_cmp(&dst_b)
             })
             .rev()
         {
-            self.draw_sprite(entity, player, textures)?;
+            self.draw_sprite(entity, &gs.player, textures)?;
         }
         Ok(())
     }
@@ -322,12 +312,12 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         x: f32,
         y: f32,
         ang: f32,
-        map: &Map,
+        gs: &GameState,
         textures: &Textures,
         mut f_hit: impl FnMut(&mut Screen<W, H>, &Texture, RayHit),
     ) -> eyre::Result<f32> {
-        let rect_w = (W / (map.w * 2)) as f32;
-        let rect_h = (H / map.h) as f32;
+        let rect_w = (W / (gs.map.w * 2)) as f32;
+        let rect_h = (H / gs.map.h) as f32;
 
         // We don't include a limit (20) unlike the src
         const INC: f32 = 0.01;
@@ -348,7 +338,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
             )?;
 
             // Out of bounds or hit an object
-            if let Some(htile) = map.tile(cx as usize, cy as usize) {
+            if let Some(htile) = gs.get_tile(cx as usize, cy as usize) {
                 // Call function on hit.
                 // TODO: Abstract to function to handle cases where no key
                 let Some(texture) = &textures.get_tile(htile) else {
@@ -387,33 +377,29 @@ impl<const W: usize, const H: usize> Screen<W, H> {
     /// * They contain (signed) fractional parts of cx and cy (endpoint coordinates of the ray) from 0.5 to -0.5
     /// * The large magnitude indicates that it is the one hit. We can get the coordinate in sprite space as a result.
     /// * Then we draw it.
-    pub fn draw_fov(
-        &mut self,
-        player: &Player,
-        map: &Map,
-        textures: &Textures,
-    ) -> eyre::Result<()> {
+    pub fn draw_fov(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
         let fw: f32 = (W / 2) as f32;
         // Angle between x-axis and fov
         // Direction - (FOV / 2)
-        let pt_1 = player.ang - player.fov / 2.;
+        let pt_1 = gs.player.ang - gs.player.fov / 2.;
         for i in 0..(W / 2) {
             // The rest of the FOV angle drawn section by section.
             // (FOV * 0..512) / 512.
-            let pt_2 = player.fov * (i as f32 / fw);
+            let pt_2 = gs.player.fov * (i as f32 / fw);
             let angle = pt_1 + pt_2;
             self.draw_ray(
-                player.x,
-                player.y,
+                gs.player.x,
+                gs.player.y,
                 angle,
-                map,
+                gs,
                 textures,
                 move |img, tile, ray_hit| {
                     // Closer means smaller c and thus large ht.
                     // We need to adjust this scaling to avoid fisheye distortion due to the ray hitting at multiple angles
                     // See https://gamedev.stackexchange.com/a/97580
                     // And https://lodev.org/cgtutor/raycasting.html
-                    let col_ht = (H as f32 / (ray_hit.dst * (angle - player.ang).cos())) as usize;
+                    let col_ht =
+                        (H as f32 / (ray_hit.dst * (angle - gs.player.ang).cos())) as usize;
                     // Draw at every angle within FOV
                     let col_x = W / 2 + i;
 
@@ -476,15 +462,15 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         Ok(())
     }
 
-    pub fn render(&mut self, player: &Player, map: &Map, textures: &Textures) -> eyre::Result<()> {
+    pub fn render(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
         // Clear buffer
         self.clear();
         // Draw fov for player
-        self.draw_fov(player, map, textures)?;
+        self.draw_fov(gs, textures)?;
         // Then draw map and player.
-        self.draw_map(player, map, textures)?;
+        self.draw_map(gs, textures)?;
         // And draw sprites
-        self.draw_sprites(player, map, textures)?;
+        self.draw_sprites(gs, textures)?;
         Ok(())
     }
 }
