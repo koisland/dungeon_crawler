@@ -6,9 +6,8 @@ use std::{
 };
 
 use eyre::{bail, ContextCompat};
-use image::{DynamicImage, GenericImageView};
 use itertools::Itertools;
-use macroquad::color::Color;
+use macroquad::{color::Color, math::Rect, prelude::ImageFormat, texture::Image};
 
 use crate::{
     enemy::{Enemy, EnemyState, EnemyType},
@@ -20,16 +19,13 @@ pub enum Texture {
     /// Single color
     Color(Color),
     /// Sprite
-    Sprite(DynamicImage),
+    Sprite(Image),
 }
 impl Texture {
     pub fn get_color(&self, x: usize, y: usize) -> Option<Color> {
         match self {
             Texture::Color(color) => Some(*color),
-            Texture::Sprite(dynamic_image) => {
-                let [r, g, b, a] = dynamic_image.get_pixel(x as u32, y as u32).0;
-                Some(Color::from_rgba(r, g, b, a))
-            }
+            Texture::Sprite(image) => Some(image.get_pixel(x as u32, y as u32)),
         }
     }
 }
@@ -94,13 +90,14 @@ impl Textures {
                 let img = if let Some(img) = texture_cache.get(src) {
                     img
                 } else {
-                    texture_cache.insert(src.to_owned(), image::open(src)?);
+                    let img_data = std::fs::read(src)?;
+                    let image = Image::from_file_with_format(&img_data, Some(ImageFormat::Png))?;
+                    texture_cache.insert(src.to_owned(), image);
                     // Already inserted.
                     texture_cache.get(src).unwrap()
                 };
 
-                let (w, _) = img.dimensions();
-                let w = w as usize;
+                let w = img.width();
                 let idx: usize = idx.parse()?;
 
                 // Assuming square.
@@ -111,10 +108,13 @@ impl Textures {
                 let x = (rem * textures.size) as u32;
                 let y = (div * textures.size) as u32;
                 // Then slice image out of sprite sheet
-                let img_slice = img
-                    .view(x, y, textures.size as u32, textures.size as u32)
-                    .to_image();
-                Texture::Sprite(DynamicImage::ImageRgba8(img_slice))
+                let img_slice = img.sub_image(Rect::new(
+                    x as f32,
+                    y as f32,
+                    textures.size as f32,
+                    textures.size as f32,
+                ));
+                Texture::Sprite(img_slice)
             };
 
             match typ {

@@ -6,7 +6,6 @@ use std::{
 };
 
 use eyre::bail;
-use image::{DynamicImage, GenericImageView};
 use itertools::Itertools;
 use macroquad::{
     color::{Color, WHITE},
@@ -34,6 +33,24 @@ pub struct RayHit {
 pub struct Screen<const W: usize, const H: usize> {
     buffer: Image,
     depth_buffer: Vec<f32>,
+}
+
+// Based on https://kwojcicki.github.io/blog/NEAREST-NEIGHBOUR
+fn nearest_neighbor(image: &Image, new_w: u16, new_h: u16) -> Image {
+    let scale_w = image.width() as f32 / new_w as f32;
+    let scale_h = image.height() as f32 / new_h as f32;
+
+    let mut new_image = Image::gen_image_color(new_w, new_h, WHITE);
+    for y in 0..new_image.height() {
+        for x in 0..new_image.width() {
+            // Scale and find nearest pixel in original image
+            let proj_x = (x as f32 * scale_w).floor() as u32;
+            let proj_y = (y as f32 * scale_h).floor() as u32;
+            let px = image.get_pixel(proj_x, proj_y);
+            new_image.set_pixel(x as u32, y as u32, px);
+        }
+    }
+    new_image
 }
 
 impl<const W: usize, const H: usize> Screen<W, H> {
@@ -105,9 +122,8 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         Ok(())
     }
 
-    pub fn draw_image(&mut self, x: usize, y: usize, image: &DynamicImage) -> eyre::Result<()> {
-        let (w, h) = image.dimensions();
-        let (w, h) = (w as usize, h as usize);
+    pub fn draw_image(&mut self, x: usize, y: usize, image: &Image) -> eyre::Result<()> {
+        let (w, h) = (image.width(), image.height());
         for i in 0..w {
             for j in 0..h {
                 let cx = x + i;
@@ -115,8 +131,8 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 if cx >= W || cy >= H {
                     continue;
                 }
-                let [r, g, b, a] = image.get_pixel(i as u32, j as u32).0;
-                self.draw_pixel(cx, cy, Color::from_rgba(r, g, b, a))?;
+                let px = image.get_pixel(i as u32, j as u32);
+                self.draw_pixel(cx, cy, px)?;
             }
         }
         Ok(())
@@ -149,7 +165,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                     }
                     Texture::Sprite(img) => {
                         // Draw thumbnail
-                        let img_thumbnail = img.thumbnail(rect_w as u32, rect_h as u32);
+                        let img_thumbnail = nearest_neighbor(img, rect_w as u16, rect_h as u16);
                         self.draw_image(rect_x, rect_y, &img_thumbnail)?;
                     }
                 };
@@ -444,14 +460,10 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                                 texcol.push(sprite.get_pixel(x_texcoord as u32, pix_y as u32));
                             }
                             // Write scaled column
-                            for (j, [r, g, b, a]) in
-                                texcol.iter().map(|px| px.0).enumerate().take(col_ht)
-                            {
+                            for (j, px) in texcol.into_iter().enumerate().take(col_ht) {
                                 // Start at middle of screen ht, then half of the column ht. Add pixels to reach col_ht again.
                                 let pix_y = j + (H / 2) - (col_ht / 2);
-                                if let Err(err) =
-                                    img.draw_pixel(col_x, pix_y, Color::from_rgba(r, g, b, a))
-                                {
+                                if let Err(err) = img.draw_pixel(col_x, pix_y, px) {
                                     eprintln!("oob for sprite ray draw: {err:?}");
                                     continue;
                                 };
