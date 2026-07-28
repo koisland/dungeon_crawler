@@ -257,7 +257,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
 
                 // Only draw opaque pixels
                 // https://colorlabs.net/posts/what-are-alpha-channels-in-digital-images
-                if color.a > 128.0 {
+                if color.a > 0.5 {
                     let px_x = hscreen_width + px_x;
                     self.draw_pixel(px_x, px_y, color)?;
                 }
