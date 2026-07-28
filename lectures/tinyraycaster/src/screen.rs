@@ -8,9 +8,12 @@ use std::{
 use eyre::bail;
 use image::{DynamicImage, GenericImageView};
 use itertools::Itertools;
+use macroquad::{
+    color::{Color, WHITE},
+    texture::Image,
+};
 
 use crate::{
-    color::Color,
     enemy::Enemy,
     map::Map,
     player::Player,
@@ -29,13 +32,14 @@ pub struct RayHit {
 // Store image in 1D array.
 // Access elems by specify w + (h * WIDTH)
 pub struct Screen<const W: usize, const H: usize> {
-    buffer: Vec<Color>,
+    buffer: Image,
     depth_buffer: Vec<f32>,
 }
 
 impl<const W: usize, const H: usize> Screen<W, H> {
     pub fn new() -> Self {
-        let buffer = vec![Color::new(255, 255, 255, None); W * H];
+        let buffer = Image::gen_image_color(W as u16, H as u16, WHITE);
+
         let depth_buffer = vec![1e3; W / 2];
         Screen::<W, H> {
             buffer,
@@ -43,12 +47,17 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         }
     }
 
+    pub fn buffer(&self) -> &Image {
+        &self.buffer
+    }
+
     pub fn clear(&mut self) {
-        self.buffer = vec![Color::new(255, 255, 255, None); W * H];
+        self.buffer = Image::gen_image_color(W as u16, H as u16, WHITE)
     }
 
     /// Write PPM file.
     /// https://netpbm.sourceforge.net/doc/ppm.html
+    #[allow(unused)]
     pub fn dump(&self, fname: impl AsRef<Path>) -> eyre::Result<()> {
         // Check images is correct size as given width and height.
         let mut fh = BufWriter::new(File::create(fname)?);
@@ -56,8 +65,9 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         write!(fh, "P3\n{W} {H}\n255\n")?;
 
         const END_CHAR: [&str; 2] = ["\n", " "];
-        for (i, px) in self.buffer.iter().take(H * W).enumerate() {
-            let (r, g, b, _) = px.channels();
+
+        for (i, px) in self.buffer.get_image_data().iter().enumerate() {
+            let [r, g, b, _] = px;
             // Place end char so after each rgb triplet, properly spaced.
             let end_char = END_CHAR[usize::from(i % W != 0)];
             write!(fh, "{r} {g} {b}{end_char}")?;
@@ -65,26 +75,37 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         Ok(())
     }
 
-    pub fn draw_pixel(&mut self, x: usize, y: usize, color: Color) {
-        self.buffer[x + y * W] = color
+    pub fn draw_pixel(&mut self, x: usize, y: usize, color: Color) -> eyre::Result<()> {
+        if x > W || y > H {
+            bail!("Pixel out of bounds")
+        }
+        self.buffer.set_pixel(x as u32, y as u32, color);
+        Ok(())
     }
 
-    pub fn draw_rect(&mut self, x: usize, y: usize, w: usize, h: usize, color: Color) {
+    pub fn draw_rect(
+        &mut self,
+        x: usize,
+        y: usize,
+        w: usize,
+        h: usize,
+        color: Color,
+    ) -> eyre::Result<()> {
         // Loop thru length and width adding px by px.
         for i in 0..w {
             for j in 0..h {
                 let cx = x + i;
                 let cy = y + j;
-                // eprintln!("({cx}, {cy})");
-                if cx >= W || cy >= H {
+                if let Err(err) = self.draw_pixel(cx, cy, color) {
+                    eprintln!("{err:?}");
                     continue;
-                }
-                self.draw_pixel(cx, cy, color);
+                };
             }
         }
+        Ok(())
     }
 
-    pub fn draw_image(&mut self, x: usize, y: usize, image: &DynamicImage) {
+    pub fn draw_image(&mut self, x: usize, y: usize, image: &DynamicImage) -> eyre::Result<()> {
         let (w, h) = image.dimensions();
         let (w, h) = (w as usize, h as usize);
         for i in 0..w {
@@ -95,9 +116,10 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                     continue;
                 }
                 let [r, g, b, a] = image.get_pixel(i as u32, j as u32).0;
-                self.draw_pixel(cx, cy, Color::new(r, g, b, Some(a)));
+                self.draw_pixel(cx, cy, Color::from_rgba(r, g, b, a))?;
             }
         }
+        Ok(())
     }
 
     // TODO: Maybe move to Map.
@@ -123,41 +145,43 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 // eprintln!("At ({x},{y}) draw {tile:?} tile at ({rect_x}, {rect_y}) ");
                 match texture {
                     Texture::Color(color) => {
-                        self.draw_rect(rect_x, rect_y, rect_w, rect_h, *color);
+                        self.draw_rect(rect_x, rect_y, rect_w, rect_h, *color)?;
                     }
                     Texture::Sprite(img) => {
                         // Draw thumbnail
                         let img_thumbnail = img.thumbnail(rect_w as u32, rect_h as u32);
-                        self.draw_image(rect_x, rect_y, &img_thumbnail);
+                        self.draw_image(rect_x, rect_y, &img_thumbnail)?;
                     }
                 };
             }
             continue;
         }
-        self.draw_player_on_map(player, map);
-        self.draw_entities_on_map(map);
+        self.draw_player_on_map(player, map)?;
+        self.draw_entities_on_map(map)?;
         Ok(())
     }
 
     // TODO: Refactor draw_* to take a struct that implents and Entity trait
-    pub fn draw_player_on_map(&mut self, player: &Player, map: &Map) {
+    pub fn draw_player_on_map(&mut self, player: &Player, map: &Map) -> eyre::Result<()> {
         let rect_w = W / (map.w * 2);
         let rect_h = H / map.h;
         // Convert from coordinates to image dim
         let x = (player.x * rect_w as f32) as usize;
         let y = (player.y * rect_h as f32) as usize;
-        self.draw_rect(x, y, 5, 5, Color::new(0, 0, 0, None));
+        self.draw_rect(x, y, 5, 5, Color::from_rgba(0, 0, 0, 0))?;
+        Ok(())
     }
 
-    pub fn draw_entities_on_map(&mut self, map: &Map) {
+    pub fn draw_entities_on_map(&mut self, map: &Map) -> eyre::Result<()> {
         let rect_w = W / (map.w * 2);
         let rect_h = H / map.h;
 
         for entity in map.id_enemy_map.values() {
             let x = (entity.x * rect_w as f32) as usize;
             let y = (entity.y * rect_h as f32) as usize;
-            self.draw_rect(x, y, 5, 5, Color::new(255, 0, 0, None));
+            self.draw_rect(x, y, 5, 5, Color::from_rgba(255, 0, 0, 0))?;
         }
+        Ok(())
     }
 
     pub fn draw_sprite(
@@ -220,11 +244,11 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                     bail!("No color.")
                 };
 
-                let (_, _, _, a) = color.channels();
                 // Only draw opaque pixels
                 // https://colorlabs.net/posts/what-are-alpha-channels-in-digital-images
-                if a > 128 {
-                    self.draw_pixel(hscreen_width + px_x, px_y, color);
+                if color.a > 128.0 {
+                    let px_x = hscreen_width + px_x;
+                    self.draw_pixel(px_x, px_y, color)?;
                 }
             }
         }
@@ -304,8 +328,8 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 px_y as usize,
                 1,
                 1,
-                Color::new(160, 160, 160, None),
-            );
+                Color::from_rgba(160, 160, 160, 0),
+            )?;
 
             // Out of bounds or hit an object
             if let Some(htile) = map.tile(cx as usize, cy as usize) {
@@ -385,7 +409,9 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                         Texture::Color(color) => {
                             // Start at middle of screen and then drop y by half the col ht. This centers the drawn line.
                             let col_y = H / 2 - col_ht / 2;
-                            img.draw_rect(col_x, col_y, 1, col_ht, *color);
+                            if let Err(err) = img.draw_rect(col_x, col_y, 1, col_ht, *color) {
+                                eprintln!("oob for color ray draw:  {err:?}")
+                            };
                         }
                         Texture::Sprite(sprite) => {
                             let size = sprite.height() as f32;
@@ -423,10 +449,12 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                             {
                                 // Start at middle of screen ht, then half of the column ht. Add pixels to reach col_ht again.
                                 let pix_y = j + (H / 2) - (col_ht / 2);
-                                if pix_y >= H {
+                                if let Err(err) =
+                                    img.draw_pixel(col_x, pix_y, Color::from_rgba(r, g, b, a))
+                                {
+                                    eprintln!("oob for sprite ray draw: {err:?}");
                                     continue;
-                                }
-                                img.draw_pixel(col_x, pix_y, Color::new(r, g, b, Some(a)));
+                                };
                             }
                         }
                     };

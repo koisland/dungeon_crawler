@@ -8,9 +8,9 @@ use std::{
 use eyre::{bail, ContextCompat};
 use image::{DynamicImage, GenericImageView};
 use itertools::Itertools;
+use macroquad::color::Color;
 
 use crate::{
-    color::Color,
     enemy::{Enemy, EnemyState, EnemyType},
     tiles::{Tile, TileState, TileType},
 };
@@ -28,7 +28,7 @@ impl Texture {
             Texture::Color(color) => Some(*color),
             Texture::Sprite(dynamic_image) => {
                 let [r, g, b, a] = dynamic_image.get_pixel(x as u32, y as u32).0;
-                Some(Color::new(r, g, b, Some(a)))
+                Some(Color::from_rgba(r, g, b, a))
             }
         }
     }
@@ -84,7 +84,7 @@ impl Textures {
                     .map(|v| v.parse::<u8>())
                     .collect_tuple()
                     .with_context(|| format!("Invalid rgb format for {src}"))?;
-                Texture::Color(Color::new(r?, g?, b?, None))
+                Texture::Color(Color::from_rgba(r?, g?, b?, 0))
             } else {
                 let path = std::path::PathBuf::from(src);
                 if !path.exists() {

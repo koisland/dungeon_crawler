@@ -1,8 +1,6 @@
-use std::{f32::consts::PI, path::PathBuf};
+use macroquad::prelude::*;
+use std::f32::consts::PI;
 
-use crate::{map::Map, player::Player, screen::Screen, textures::Textures};
-
-mod color;
 mod enemy;
 mod map;
 mod player;
@@ -10,15 +8,17 @@ mod screen;
 mod textures;
 mod tiles;
 
-fn main() -> eyre::Result<()> {
-    // Parse map.
+use crate::{map::Map, player::Player, screen::Screen, textures::Textures};
+
+#[macroquad::main("tinyraycaster")]
+async fn main() -> eyre::Result<()> {
     let mut map = Map::new("lectures/tinyraycaster/data/map.txt")?;
     map.with_state("lectures/tinyraycaster/data/state.tsv")?;
 
     let textures = Textures::new("lectures/tinyraycaster/data/textures.tsv", 64)?;
+    let mut screen = Screen::<1024, 512>::new();
 
     // With initialization function.
-    let mut screen = Screen::<1024, 512>::new();
     // TODO: Allow setting fov in degrees but internally use radians.
     let mut player = Player {
         x: 3.456,
@@ -27,15 +27,13 @@ fn main() -> eyre::Result<()> {
         fov: PI / 3.0,
     };
 
-    let outdir = PathBuf::from(".");
-    for i in 0..1 {
-        let fname = outdir.join(format!("{i}.ppm"));
+    loop {
         player.ang += 2.0 * PI / 360.0;
         // Render frame
         screen.render(&player, &map, &textures)?;
-        // Before dumping to outfile.
-        screen.dump(fname)?;
-    }
 
-    Ok(())
+        let texture = Texture2D::from_image(screen.buffer());
+        draw_texture(&texture, 0., 0., WHITE);
+        next_frame().await
+    }
 }
