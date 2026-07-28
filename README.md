@@ -1,7 +1,12 @@
 # tiny lectures
-Based on:
-* https://github.com/ssloy/tinyraycaster/wiki
-* https://github.com/ssloy/tinyrenderer
+
+## tinyraycaster
+From https://github.com/ssloy/tinyraycaster
+
+![](docs/tinyraycaster.png)
+
+## tinyrenderer
+From https://github.com/ssloy/tinyrenderer
 
 ## Usage
 ```bash
