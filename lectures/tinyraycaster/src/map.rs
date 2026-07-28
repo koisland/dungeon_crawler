@@ -61,4 +61,16 @@ impl Map {
         map.h = map_h;
         Ok(map)
     }
+
+    // pub fn update_src(x: usize, y: usize, c: char) -> eyre::Result<()> {
+    //     todo!()
+    // }
+
+    pub fn is_in_bounds(&self, x: i32, y: i32) -> bool {
+        x > 0 && x < self.w as i32 && y > 0 && y < self.h as i32
+    }
+
+    pub fn is_empty(&self, x: usize, y: usize) -> bool {
+        self.src.as_bytes()[y * self.w + x] == b' '
+    }
 }

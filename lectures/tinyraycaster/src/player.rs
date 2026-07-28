@@ -1,5 +1,7 @@
 use std::f32::consts::PI;
 
+use crate::map::Map;
+
 /// Player
 pub struct Player {
     /// Player x coordinate
@@ -8,9 +10,45 @@ pub struct Player {
     pub y: f32,
     /// Player view direction in radians
     /// the angle between the view direction and the x axis
-    pub ang: f32,
+    pub angle: f32,
     /// Player fov in radians where midpoint is self.direction
     pub fov: f32,
+    /// If walking
+    pub walk: WalkState,
+    pub walk_speed: f32,
+    // If turning
+    pub turn: TurnState,
+    pub turn_speed: f32,
+}
+
+impl Player {
+    /// Turn player adjusting angle based on [TurnState] and speed.
+    pub fn turn(&mut self) {
+        self.angle += self.turn_speed * (self.turn as i32) as f32
+    }
+
+    /// Move player based on [WalkState] and speed. Also checks if in bound.
+    // TODO: Velocity
+    pub fn walk(&mut self, map: &Map) {
+        let walk_magn = (self.walk as i32) as f32;
+        let new_x = self.x + walk_magn * self.angle.cos() * self.walk_speed;
+        let new_y = self.y + walk_magn * self.angle.sin() * self.walk_speed;
+
+        if map.is_in_bounds(new_x as i32, new_y as i32) {
+            // Move if empty space
+            if map.is_empty(new_x as usize, self.y as usize) {
+                self.x = new_x;
+            }
+            if map.is_empty(self.x as usize, new_y as usize) {
+                self.y = new_y;
+            }
+        }
+    }
+
+    pub fn update(&mut self, map: &Map) {
+        self.turn();
+        self.walk(map);
+    }
 }
 
 impl Default for Player {
@@ -18,8 +56,26 @@ impl Default for Player {
         Self {
             x: 3.456,
             y: 2.345,
-            ang: 1.523,
+            angle: 1.523,
             fov: PI / 3.0,
+            walk: WalkState::Stop,
+            walk_speed: 0.05,
+            turn: TurnState::Stop,
+            turn_speed: 0.05,
         }
     }
+}
+
+#[derive(Clone, Copy)]
+pub enum WalkState {
+    Forward = 1,
+    Stop = 0,
+    Reverse = -1,
+}
+
+#[derive(Clone, Copy)]
+pub enum TurnState {
+    Left = -1,
+    Stop = 0,
+    Right = 1,
 }

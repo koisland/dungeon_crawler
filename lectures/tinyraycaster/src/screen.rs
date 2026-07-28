@@ -92,50 +92,37 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         Ok(())
     }
 
-    pub fn draw_pixel(&mut self, x: usize, y: usize, color: Color) -> eyre::Result<()> {
-        if x > W || y > H {
-            bail!("Pixel out of bounds")
+    pub fn draw_pixel(&mut self, x: usize, y: usize, color: Color) {
+        if x >= W || y >= H {
+            return;
         }
         self.buffer.set_pixel(x as u32, y as u32, color);
-        Ok(())
     }
 
-    pub fn draw_rect(
-        &mut self,
-        x: usize,
-        y: usize,
-        w: usize,
-        h: usize,
-        color: Color,
-    ) -> eyre::Result<()> {
+    pub fn draw_rect(&mut self, x: usize, y: usize, w: usize, h: usize, color: Color) {
         // Loop thru length and width adding px by px.
         for i in 0..w {
             for j in 0..h {
                 let cx = x + i;
                 let cy = y + j;
-                if let Err(err) = self.draw_pixel(cx, cy, color) {
-                    eprintln!("{err:?}");
-                    continue;
-                };
+                self.draw_pixel(cx, cy, color);
             }
         }
-        Ok(())
     }
 
-    pub fn draw_image(&mut self, x: usize, y: usize, image: &Image) -> eyre::Result<()> {
+    pub fn draw_image(&mut self, x: usize, y: usize, image: &Image) {
         let (w, h) = (image.width(), image.height());
         for i in 0..w {
             for j in 0..h {
                 let cx = x + i;
                 let cy = y + j;
-                if cx >= W || cy >= H {
+                if cx > W || cy > H {
                     continue;
                 }
                 let px = image.get_pixel(i as u32, j as u32);
-                self.draw_pixel(cx, cy, px)?;
+                self.draw_pixel(cx, cy, px)
             }
         }
-        Ok(())
     }
 
     // TODO: Maybe move to Map.
@@ -156,12 +143,12 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 // eprintln!("At ({x},{y}) draw {tile:?} tile at ({rect_x}, {rect_y}) ");
                 match texture {
                     Texture::Color(color) => {
-                        self.draw_rect(rect_x, rect_y, rect_w, rect_h, *color)?;
+                        self.draw_rect(rect_x, rect_y, rect_w, rect_h, *color);
                     }
                     Texture::Sprite(img) => {
                         // Draw thumbnail
                         let img_thumbnail = nearest_neighbor(img, rect_w as u16, rect_h as u16);
-                        self.draw_image(rect_x, rect_y, &img_thumbnail)?;
+                        self.draw_image(rect_x, rect_y, &img_thumbnail);
                     }
                 };
             }
@@ -179,7 +166,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         // Convert from coordinates to image dim
         let x = (gs.player.x * rect_w as f32) as usize;
         let y = (gs.player.y * rect_h as f32) as usize;
-        self.draw_rect(x, y, 5, 5, Color::from_rgba(0, 0, 0, 0))?;
+        self.draw_rect(x, y, 5, 5, Color::from_rgba(0, 0, 0, 0));
         Ok(())
     }
 
@@ -190,7 +177,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         for entity in gs.id_enemy_map.values() {
             let x = (entity.x * rect_w as f32) as usize;
             let y = (entity.y * rect_h as f32) as usize;
-            self.draw_rect(x, y, 5, 5, Color::from_rgba(255, 0, 0, 0))?;
+            self.draw_rect(x, y, 5, 5, Color::from_rgba(255, 0, 0, 0));
         }
         Ok(())
     }
@@ -206,10 +193,10 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         // Use atan2 incase where x is negative. Allows getting angle with range across all 4 quadrants as opposed to 2 (1 and 4).
         // Angle of enemy relative to player
         let mut angle = (enemy.y - player.y).atan2(enemy.x - player.x);
-        while angle - player.ang > PI {
+        while angle - player.angle > PI {
             angle -= 2. * PI;
         } // remove unncesessary periods from the relative direction
-        while angle - player.ang < -PI {
+        while angle - player.angle < -PI {
             angle += 2. * PI;
         }
 
@@ -218,7 +205,8 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         };
         // Scale sprite by distance from player and clamp to 2000 if very close.
         let sprite_screen_size = ((H as f32 / enemy.dst) as usize).min(2000);
-        let h_offset = ((angle - player.ang) * (W / 2) as f32 / (player.fov) + (W / 2) as f32 / 2.
+        let h_offset = ((angle - player.angle) * (W / 2) as f32 / (player.fov)
+            + (W / 2) as f32 / 2.
             - sprite_screen_size as f32 / 2.) as i32; // do not forget the 3D view takes only a half of the framebuffer, thus fb.w/2 for the screen width
         let v_offset = (H / 2 - sprite_screen_size / 2) as i32;
 
@@ -252,7 +240,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 if color.a > 0.5 {
                     let px_x = (W / 2) + px_x as usize;
                     let px_y = px_y as usize;
-                    self.draw_pixel(px_x, px_y, color)?;
+                    self.draw_pixel(px_x, px_y, color)
                 }
             }
         }
@@ -328,7 +316,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 1,
                 1,
                 Color::from_rgba(190, 190, 190, 128),
-            )?;
+            );
 
             // Out of bounds or hit an object
             if let Some(htile) = gs.get_tile(cx as usize, cy as usize) {
@@ -374,7 +362,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         let fw: f32 = (W / 2) as f32;
         // Angle between x-axis and fov
         // Direction - (FOV / 2)
-        let pt_1 = gs.player.ang - gs.player.fov / 2.;
+        let pt_1 = gs.player.angle - gs.player.fov / 2.;
         for i in 0..(W / 2) {
             // The rest of the FOV angle drawn section by section.
             // (FOV * 0..512) / 512.
@@ -392,7 +380,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                     // See https://gamedev.stackexchange.com/a/97580
                     // And https://lodev.org/cgtutor/raycasting.html
                     let col_ht =
-                        (H as f32 / (ray_hit.dst * (angle - gs.player.ang).cos())) as usize;
+                        (H as f32 / (ray_hit.dst * (angle - gs.player.angle).cos())) as usize;
                     // Draw at every angle within FOV
                     let col_x = W / 2 + i;
 
@@ -404,9 +392,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                         Texture::Color(color) => {
                             // Start at middle of screen and then drop y by half the col ht. This centers the drawn line.
                             let col_y = H / 2 - col_ht / 2;
-                            if let Err(err) = img.draw_rect(col_x, col_y, 1, col_ht, *color) {
-                                eprintln!("oob for color ray draw:  {err:?}")
-                            };
+                            img.draw_rect(col_x, col_y, 1, col_ht, *color);
                         }
                         Texture::Sprite(sprite) => {
                             let size = sprite.height() as f32;
@@ -432,20 +418,18 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                             assert!(x_texcoord >= 0.0 && x_texcoord < size);
 
                             // Scale column to height.
-                            let mut texcol = vec![];
+                            let mut texcol = Vec::with_capacity(col_ht);
                             for y in 0..col_ht {
                                 let pix_y = (y as f32 * size) / col_ht as f32;
-                                // eprintln!("{y}*{size}/{col_ht}={pix_y}");
                                 texcol.push(sprite.get_pixel(x_texcoord as u32, pix_y as u32));
                             }
                             // Write scaled column
                             for (j, px) in texcol.into_iter().enumerate().take(col_ht) {
                                 // Start at middle of screen ht, then half of the column ht. Add pixels to reach col_ht again.
-                                let pix_y = j + (H / 2) - (col_ht / 2);
-                                if let Err(err) = img.draw_pixel(col_x, pix_y, px) {
-                                    eprintln!("oob for sprite ray draw: {err:?}");
+                                let Some(pix_y) = (j + (H / 2)).checked_sub(col_ht / 2) else {
                                     continue;
                                 };
+                                img.draw_pixel(col_x, pix_y, px)
                             }
                         }
                     };

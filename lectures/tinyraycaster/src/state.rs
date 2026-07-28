@@ -5,15 +5,15 @@ use std::{
     str::FromStr,
 };
 
-use eyre::bail;
-use itertools::Itertools;
-
 use crate::{
     enemy::{Enemy, EnemyState, EnemyType},
     map::Map,
-    player::Player,
+    player::{Player, TurnState, WalkState},
     tiles::{Tile, TileState, TileType},
 };
+use eyre::bail;
+use itertools::Itertools;
+use macroquad::prelude::*;
 
 #[derive(Default)]
 pub struct GameState {
@@ -114,5 +114,35 @@ impl GameState {
         self.enemy_pos_id_map
             .insert((enemy.x as usize, enemy.y as usize), eid);
         self.id_enemy_map.insert(eid, enemy);
+    }
+
+    pub fn update_all(&mut self) {
+        // Stop walking and turning
+        if is_key_released(KeyCode::W)
+            || is_key_released(KeyCode::A)
+            || is_key_released(KeyCode::S)
+            || is_key_released(KeyCode::D)
+        {
+            self.player.turn = TurnState::Stop;
+            self.player.walk = WalkState::Stop;
+        }
+        if is_key_down(KeyCode::W) {
+            self.player.walk = WalkState::Forward
+        }
+        if is_key_down(KeyCode::A) {
+            self.player.turn = TurnState::Left
+        }
+        if is_key_down(KeyCode::S) {
+            self.player.walk = WalkState::Reverse
+        }
+        if is_key_down(KeyCode::D) {
+            self.player.turn = TurnState::Right
+        }
+        // Update player position
+        self.player.update(&self.map);
+        // Update enemies
+        for enemy in self.id_enemy_map.values_mut() {
+            enemy.dst = enemy.dst_from_player(&self.player)
+        }
     }
 }

@@ -1,8 +1,5 @@
 use macroquad::prelude::*;
-use std::{
-    f32::consts::PI,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 mod enemy;
 mod map;
@@ -47,8 +44,12 @@ async fn main() -> eyre::Result<()> {
     let frame_dur = Duration::from_secs_f64(1.0 / fps_target);
     let mut next_tick = Instant::now();
     loop {
-        // Logic
-        gs.player.ang += 0.5 * PI / 360.0;
+        // Exit
+        if is_key_down(KeyCode::Escape) || is_quit_requested() {
+            break Ok(());
+        }
+        // Update state
+        gs.update_all();
 
         // Limit FPS
         next_tick += frame_dur;
