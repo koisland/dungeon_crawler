@@ -1,0 +1,11 @@
+#type	lbl	state	src	src_idx
+tile	rock	base	data/walltext.png	0
+tile	gray_brick	base	data/walltext.png	1
+tile	red_brick	base	data/walltext.png	2
+tile	door	base	data/walltext.png	3
+tile	green_rock	base	data/walltext.png	4
+tile	green_hex	base	data/walltext.png	5
+enemy	red_blob	base	data/monsters.png	0
+enemy	red_blob	injured	data/monsters.png	1
+enemy	demon	base	data/monsters.png	2
+enemy	demon	enraged	data/monsters.png	3
