@@ -18,11 +18,6 @@ const HEIGHT: usize = 512;
 fn window_conf() -> Conf {
     Conf {
         window_title: "tinyraycaster".to_owned(),
-        sample_count: 0,
-        platform: miniquad::conf::Platform {
-            swap_interval: Some(0),
-            ..Default::default()
-        },
         window_resizable: false,
         window_width: WIDTH as i32,
         window_height: HEIGHT as i32,
@@ -34,12 +29,14 @@ fn window_conf() -> Conf {
 async fn main() -> eyre::Result<()> {
     let mut gs = GameState::new("data/map.txt", "data/state.tsv")?;
     let textures = Textures::new("data/textures.tsv", 64)?;
-    let mut screen = Screen::<WIDTH, HEIGHT>::new();
+    let mut screen = Screen::new(WIDTH, HEIGHT, gs.map.w * 10, gs.map.h * 10);
 
     // https://github.com/not-fl3/macroquad/issues/380#issuecomment-4775299639
     let fps_target = 60.0;
     let frame_dur = Duration::from_secs_f64(1.0 / fps_target);
     let mut next_tick = Instant::now();
+    // root_ui().window(hash!(), vec2(20., 250.), vec2(300., 300.), |_ui| {});
+
     loop {
         // Exit
         if is_key_down(KeyCode::Escape) || is_quit_requested() {
@@ -58,8 +55,7 @@ async fn main() -> eyre::Result<()> {
         }
         // Render frame
         screen.render(&gs, &textures)?;
-        let texture = Texture2D::from_image(screen.buffer());
-        draw_texture(&texture, 0., 0., WHITE);
+
         // FPS
         draw_text(
             format!(

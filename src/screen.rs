@@ -7,10 +7,7 @@ use std::{
 
 use eyre::bail;
 use itertools::Itertools;
-use macroquad::{
-    color::{Color, WHITE},
-    texture::Image,
-};
+use macroquad::prelude::*;
 
 use crate::{
     enemy::Enemy,
@@ -30,9 +27,46 @@ pub struct RayHit {
 
 // Store image in 1D array.
 // Access elems by specify w + (h * WIDTH)
-pub struct Screen<const W: usize, const H: usize> {
-    buffer: Image,
-    depth_buffer: Vec<f32>,
+pub struct Screen {
+    pub buffer: Image,
+    pub texture: Texture2D,
+    pub map_buffer: Image,
+    pub map_texture: Texture2D,
+    pub depth_buffer: Vec<f32>,
+}
+
+pub fn draw_pixel(image: &mut Image, x: usize, y: usize, color: Color) {
+    if x >= image.width() || y >= image.height() {
+        return;
+    }
+    image.set_pixel(x as u32, y as u32, color);
+}
+
+pub fn draw_rect(image: &mut Image, x: usize, y: usize, w: usize, h: usize, color: Color) {
+    // Loop thru length and width adding px by px.
+    for i in 0..w {
+        for j in 0..h {
+            let cx = x + i;
+            let cy = y + j;
+            draw_pixel(image, cx, cy, color);
+        }
+    }
+}
+
+pub fn draw_image(buffer: &mut Image, x: usize, y: usize, image: &Image) {
+    let (w, h) = (buffer.width(), buffer.height());
+    let (img_w, img_h) = (image.width(), image.height());
+    for i in 0..img_w {
+        for j in 0..img_h {
+            let cx = x + i;
+            let cy = y + j;
+            if cx > w || cy > h {
+                continue;
+            }
+            let px = image.get_pixel(i as u32, j as u32);
+            draw_pixel(buffer, cx, cy, px)
+        }
+    }
 }
 
 // Based on https://kwojcicki.github.io/blog/NEAREST-NEIGHBOUR
@@ -53,83 +87,54 @@ fn nearest_neighbor(image: &Image, new_w: u16, new_h: u16) -> Image {
     new_image
 }
 
-impl<const W: usize, const H: usize> Screen<W, H> {
-    pub fn new() -> Self {
-        let buffer = Image::gen_image_color(W as u16, H as u16, WHITE);
-
-        let depth_buffer = vec![1e3; W / 2];
-        Screen::<W, H> {
+impl Screen {
+    pub fn new(w: usize, h: usize, mw: usize, mh: usize) -> Self {
+        let buffer = Image::gen_image_color(w as u16, h as u16, WHITE);
+        let map_buffer = Image::gen_image_color(mw as u16, mh as u16, WHITE);
+        let texture = Texture2D::from_image(&buffer);
+        let map_texture = Texture2D::from_image(&map_buffer);
+        let depth_buffer = vec![1e3; w];
+        Screen {
             buffer,
+            map_buffer,
             depth_buffer,
+            texture,
+            map_texture,
         }
     }
 
-    pub fn buffer(&self) -> &Image {
-        &self.buffer
-    }
-
     pub fn clear(&mut self) {
-        self.buffer = Image::gen_image_color(W as u16, H as u16, WHITE)
+        let (w, h) = (self.buffer.width, self.buffer.height);
+        let (mw, mh) = (self.map_buffer.width, self.map_buffer.height);
+        self.buffer = Image::gen_image_color(w, h, WHITE);
+        self.map_buffer = Image::gen_image_color(mw, mh, WHITE);
     }
 
     /// Write PPM file.
     /// https://netpbm.sourceforge.net/doc/ppm.html
     #[allow(unused)]
     pub fn dump(&self, fname: impl AsRef<Path>) -> eyre::Result<()> {
+        let (w, h) = (self.buffer.width(), self.buffer.height());
         // Check images is correct size as given width and height.
         let mut fh = BufWriter::new(File::create(fname)?);
         // Write magic number identifying file type, w, h, max color value. All delimited by newline.
-        write!(fh, "P3\n{W} {H}\n255\n")?;
+        write!(fh, "P3\n{} {}\n255\n", w, h)?;
 
         const END_CHAR: [&str; 2] = ["\n", " "];
 
         for (i, px) in self.buffer.get_image_data().iter().enumerate() {
             let [r, g, b, _] = px;
             // Place end char so after each rgb triplet, properly spaced.
-            let end_char = END_CHAR[usize::from(i % W != 0)];
+            let end_char = END_CHAR[usize::from(i % w != 0)];
             write!(fh, "{r} {g} {b}{end_char}")?;
         }
         Ok(())
     }
 
-    pub fn draw_pixel(&mut self, x: usize, y: usize, color: Color) {
-        if x >= W || y >= H {
-            return;
-        }
-        self.buffer.set_pixel(x as u32, y as u32, color);
-    }
-
-    pub fn draw_rect(&mut self, x: usize, y: usize, w: usize, h: usize, color: Color) {
-        // Loop thru length and width adding px by px.
-        for i in 0..w {
-            for j in 0..h {
-                let cx = x + i;
-                let cy = y + j;
-                self.draw_pixel(cx, cy, color);
-            }
-        }
-    }
-
-    pub fn draw_image(&mut self, x: usize, y: usize, image: &Image) {
-        let (w, h) = (image.width(), image.height());
-        for i in 0..w {
-            for j in 0..h {
-                let cx = x + i;
-                let cy = y + j;
-                if cx > W || cy > H {
-                    continue;
-                }
-                let px = image.get_pixel(i as u32, j as u32);
-                self.draw_pixel(cx, cy, px)
-            }
-        }
-    }
-
     // TODO: Maybe move to Map.
     pub fn draw_map(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
-        let rect_w = W / (gs.map.w * 2);
-        let rect_h = H / gs.map.h;
-        // eprintln!("Rects (w: {rect_w}, h: {rect_h})");
+        let rect_w = self.map_buffer.width() / gs.map.w;
+        let rect_h = self.map_buffer.height() / gs.map.h;
 
         for (x, y, tile) in gs.get_tiles() {
             if let Some(tile) = tile {
@@ -143,12 +148,12 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 // eprintln!("At ({x},{y}) draw {tile:?} tile at ({rect_x}, {rect_y}) ");
                 match texture {
                     Texture::Color(color) => {
-                        self.draw_rect(rect_x, rect_y, rect_w, rect_h, *color);
+                        draw_rect(&mut self.map_buffer, rect_x, rect_y, rect_w, rect_h, *color);
                     }
                     Texture::Sprite(img) => {
                         // Draw thumbnail
                         let img_thumbnail = nearest_neighbor(img, rect_w as u16, rect_h as u16);
-                        self.draw_image(rect_x, rect_y, &img_thumbnail);
+                        draw_image(&mut self.map_buffer, rect_x, rect_y, &img_thumbnail);
                     }
                 };
             }
@@ -159,25 +164,38 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         Ok(())
     }
 
-    // TODO: Refactor draw_* to take a struct that implents and Entity trait
     pub fn draw_player_on_map(&mut self, gs: &GameState) -> eyre::Result<()> {
-        let rect_w = W / (gs.map.w * 2);
-        let rect_h = H / gs.map.h;
+        let rect_w = self.map_buffer.width() / gs.map.w;
+        let rect_h = self.map_buffer.height() / gs.map.h;
         // Convert from coordinates to image dim
         let x = (gs.player.x * rect_w as f32) as usize;
         let y = (gs.player.y * rect_h as f32) as usize;
-        self.draw_rect(x, y, 5, 5, Color::from_rgba(0, 0, 0, 0));
+        draw_rect(
+            &mut self.map_buffer,
+            x,
+            y,
+            5,
+            5,
+            Color::from_rgba(0, 0, 0, 255),
+        );
         Ok(())
     }
 
     pub fn draw_entities_on_map(&mut self, gs: &GameState) -> eyre::Result<()> {
-        let rect_w = W / (gs.map.w * 2);
-        let rect_h = H / gs.map.h;
+        let rect_w = self.map_buffer.width() / gs.map.w;
+        let rect_h = self.map_buffer.height() / gs.map.h;
 
         for entity in gs.id_enemy_map.values() {
             let x = (entity.x * rect_w as f32) as usize;
             let y = (entity.y * rect_h as f32) as usize;
-            self.draw_rect(x, y, 5, 5, Color::from_rgba(255, 0, 0, 0));
+            draw_rect(
+                &mut self.map_buffer,
+                x,
+                y,
+                5,
+                5,
+                Color::from_rgba(255, 0, 0, 255),
+            );
         }
         Ok(())
     }
@@ -188,6 +206,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         player: &Player,
         textures: &Textures,
     ) -> eyre::Result<()> {
+        let (w, h) = (self.buffer.width(), self.buffer.height());
         // https://www.youtube.com/watch?v=VMYk9fqXz_4
         // https://stackoverflow.com/questions/283406/what-is-the-difference-between-atan-and-atan2-in-c
         // Use atan2 incase where x is negative. Allows getting angle with range across all 4 quadrants as opposed to 2 (1 and 4).
@@ -204,17 +223,16 @@ impl<const W: usize, const H: usize> Screen<W, H> {
             bail!("No texture for enemy {enemy:?}")
         };
         // Scale sprite by distance from player and clamp to 2000 if very close.
-        let sprite_screen_size = ((H as f32 / enemy.dst) as usize).min(2000);
-        let h_offset = ((angle - player.angle) * (W / 2) as f32 / (player.fov)
-            + (W / 2) as f32 / 2.
+        let sprite_screen_size = ((h as f32 / enemy.dst) as usize).min(2000);
+        let h_offset = ((angle - player.angle) * w as f32 / (player.fov) + w as f32 / 2.
             - sprite_screen_size as f32 / 2.) as i32; // do not forget the 3D view takes only a half of the framebuffer, thus fb.w/2 for the screen width
-        let v_offset = (H / 2 - sprite_screen_size / 2) as i32;
+        let v_offset = (h / 2 - sprite_screen_size / 2) as i32;
 
         for i in 0..sprite_screen_size {
             let i_int = i as i32;
             let px_x = h_offset + i_int;
             // Don't draw horizontal pixel if OOB
-            if px_x < 0 || px_x >= W as i32 / 2 {
+            if px_x < 0 || px_x >= w as i32 {
                 continue;
             }
             // Occluded. Pixel at x-pos in front of sprite (closer).
@@ -225,7 +243,7 @@ impl<const W: usize, const H: usize> Screen<W, H> {
             for j in 0..sprite_screen_size {
                 let j_int = j as i32;
                 let px_y = v_offset + j_int;
-                if px_y < 0 || px_y >= H as i32 {
+                if px_y < 0 || px_y >= h as i32 {
                     continue;
                 }
                 let Some(color) = texture.get_color(
@@ -238,9 +256,9 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                 // Only draw opaque pixels
                 // https://colorlabs.net/posts/what-are-alpha-channels-in-digital-images
                 if color.a > 0.5 {
-                    let px_x = (W / 2) + px_x as usize;
+                    let px_x = px_x as usize;
                     let px_y = px_y as usize;
-                    self.draw_pixel(px_x, px_y, color)
+                    draw_pixel(&mut self.buffer, px_x, px_y, color)
                 }
             }
         }
@@ -295,10 +313,11 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         ang: f32,
         gs: &GameState,
         textures: &Textures,
-        mut f_hit: impl FnMut(&mut Screen<W, H>, &Texture, RayHit),
+        mut f_hit: impl FnMut(&mut Screen, &Texture, RayHit),
     ) -> eyre::Result<f32> {
-        let rect_w = (W / (gs.map.w * 2)) as f32;
-        let rect_h = (H / gs.map.h) as f32;
+        let (w, h) = (self.map_buffer.width(), self.map_buffer.height());
+        let rect_w = (w / gs.map.w) as f32;
+        let rect_h = (h / gs.map.h) as f32;
 
         // We don't include a limit (20) unlike the src
         const INC: f32 = 0.01;
@@ -310,12 +329,13 @@ impl<const W: usize, const H: usize> Screen<W, H> {
             // Otherwise, draw ray
             let px_x = cx * rect_w;
             let px_y = cy * rect_h;
-            self.draw_rect(
+            draw_rect(
+                &mut self.map_buffer,
                 px_x as usize,
                 px_y as usize,
                 1,
                 1,
-                Color::from_rgba(190, 190, 190, 128),
+                Color::from_rgba(190, 190, 190, 255),
             );
 
             // Out of bounds or hit an object
@@ -359,11 +379,12 @@ impl<const W: usize, const H: usize> Screen<W, H> {
     /// * The large magnitude indicates that it is the one hit. We can get the coordinate in sprite space as a result.
     /// * Then we draw it.
     pub fn draw_fov(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
-        let fw: f32 = (W / 2) as f32;
+        let (w, h) = (self.buffer.width(), self.buffer.height());
+        let fw: f32 = w as f32;
         // Angle between x-axis and fov
         // Direction - (FOV / 2)
         let pt_1 = gs.player.angle - gs.player.fov / 2.;
-        for i in 0..(W / 2) {
+        for i in 0..w {
             // The rest of the FOV angle drawn section by section.
             // (FOV * 0..512) / 512.
             let pt_2 = gs.player.fov * (i as f32 / fw);
@@ -380,9 +401,9 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                     // See https://gamedev.stackexchange.com/a/97580
                     // And https://lodev.org/cgtutor/raycasting.html
                     let col_ht =
-                        (H as f32 / (ray_hit.dst * (angle - gs.player.angle).cos())) as usize;
+                        (h as f32 / (ray_hit.dst * (angle - gs.player.angle).cos())) as usize;
                     // Draw at every angle within FOV
-                    let col_x = W / 2 + i;
+                    let col_x = i;
 
                     // Store distance to know what to occlude from fov
                     img.depth_buffer[i] = ray_hit.dst;
@@ -391,8 +412,8 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                     match tile {
                         Texture::Color(color) => {
                             // Start at middle of screen and then drop y by half the col ht. This centers the drawn line.
-                            let col_y = H / 2 - col_ht / 2;
-                            img.draw_rect(col_x, col_y, 1, col_ht, *color);
+                            let col_y = h / 2 - col_ht / 2;
+                            draw_rect(&mut img.buffer, col_x, col_y, 1, col_ht, *color);
                         }
                         Texture::Sprite(sprite) => {
                             let size = sprite.height() as f32;
@@ -426,10 +447,10 @@ impl<const W: usize, const H: usize> Screen<W, H> {
                             // Write scaled column
                             for (j, px) in texcol.into_iter().enumerate().take(col_ht) {
                                 // Start at middle of screen ht, then half of the column ht. Add pixels to reach col_ht again.
-                                let Some(pix_y) = (j + (H / 2)).checked_sub(col_ht / 2) else {
+                                let Some(pix_y) = (j + (h / 2)).checked_sub(col_ht / 2) else {
                                     continue;
                                 };
-                                img.draw_pixel(col_x, pix_y, px)
+                                draw_pixel(&mut img.buffer, col_x, pix_y, px)
                             }
                         }
                     };
@@ -444,10 +465,20 @@ impl<const W: usize, const H: usize> Screen<W, H> {
         self.clear();
         // Draw fov for player
         self.draw_fov(gs, textures)?;
-        // Then draw map and player.
-        self.draw_map(gs, textures)?;
         // And draw sprites
         self.draw_sprites(gs, textures)?;
+
+        // Then update
+        self.texture.update(&self.buffer);
+        draw_texture(&self.texture, 0., 0., WHITE);
+
+        // Draw map
+        self.draw_map(gs, textures)?;
+        self.map_texture.update(&self.map_buffer);
+        let map_x = self.buffer.width() - self.map_buffer.width();
+        let map_y = self.buffer.height() - self.map_buffer.height();
+        draw_texture(&self.map_texture, map_x as f32, map_y as f32, GRAY);
+
         Ok(())
     }
 }
