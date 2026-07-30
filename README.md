@@ -1,4 +1,5 @@
-# .
+# dungeon_crawler
+A simple dungeon crawler built in `macroquad`.
 
 ## Usage
 ```bash
@@ -11,3 +12,4 @@ cargo run --release
 
 ## References
 * https://github.com/ssloy/tinyraycaster
+* https://github.com/not-fl3/macroquad
