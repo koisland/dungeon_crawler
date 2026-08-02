@@ -7,7 +7,12 @@ use std::{
 
 use eyre::{bail, ContextCompat};
 use itertools::Itertools;
-use macroquad::{color::Color, math::Rect, prelude::ImageFormat, texture::Image};
+use macroquad::{
+    color::{Color, BLUE, GRAY},
+    math::Rect,
+    prelude::ImageFormat,
+    texture::Image,
+};
 
 use crate::{
     enemy::{Enemy, EnemyState, EnemyType},
@@ -34,6 +39,10 @@ impl Texture {
 pub struct Textures {
     // Size of texture square length and width.
     pub size: usize,
+    // Floor texture
+    pub floor: Texture,
+    // Ceiling texture
+    pub ceiling: Texture,
     // Textures mapped to map tiles and state
     pub tiles: HashMap<TileType, HashMap<TileState, Texture>>,
     // Textures mapped to map entities and state
@@ -56,6 +65,8 @@ impl Textures {
     pub fn new(infile: &str, size: usize) -> eyre::Result<Self> {
         let mut textures = Textures {
             size,
+            floor: Texture::Color(BLUE),
+            ceiling: Texture::Color(GRAY),
             tiles: HashMap::new(),
             entities: HashMap::new(),
         };
@@ -140,6 +151,12 @@ impl Textures {
                             .entities
                             .insert(enemy, HashMap::from_iter([(texture_state, texture)]));
                     }
+                }
+                "floor" => {
+                    textures.floor = texture;
+                }
+                "ceiling" => {
+                    textures.ceiling = texture;
                 }
                 _ => bail!("Invalid type. {typ}"),
             };

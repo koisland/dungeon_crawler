@@ -1,4 +1,6 @@
 #type	lbl	state	src	src_idx
+floor	.	.	data/walltext.png	1
+ceiling	.	.	data/walltext.png	1
 tile	rock	base	data/walltext.png	0
 tile	gray_brick	base	data/walltext.png	1
 tile	red_brick	base	data/walltext.png	2

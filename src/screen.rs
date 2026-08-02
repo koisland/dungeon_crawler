@@ -14,6 +14,7 @@ use crate::{
     player::Player,
     state::GameState,
     textures::{Texture, Textures},
+    tiles::Tile,
 };
 
 pub struct RayHit {
@@ -107,6 +108,12 @@ impl Screen {
         let (w, h) = (self.buffer.width, self.buffer.height);
         let (mw, mh) = (self.map_buffer.width, self.map_buffer.height);
         self.buffer = Image::gen_image_color(w, h, WHITE);
+        // // Color top half dark gray
+        // for x in 0..w {
+        //     for y in 0..h/2 {
+        //         self.buffer.set_pixel(x as u32, y as u32, DARKGRAY);
+        //     }
+        // }
         self.map_buffer = Image::gen_image_color(mw, mh, WHITE);
     }
 
@@ -306,15 +313,13 @@ impl Screen {
     /// * `y = p_y + c * sin(p_angle)`
     ///
     /// This function returns the distance (length of c) to the endpoint of the ray.
-    pub fn draw_ray(
+    pub fn draw_ray<'a>(
         &mut self,
         x: f32,
         y: f32,
         ang: f32,
-        gs: &GameState,
-        textures: &Textures,
-        mut f_hit: impl FnMut(&mut Screen, &Texture, RayHit),
-    ) -> eyre::Result<f32> {
+        gs: &'a GameState,
+    ) -> eyre::Result<(&'a Tile, RayHit)> {
         let (w, h) = (self.map_buffer.width(), self.map_buffer.height());
         let rect_w = (w / gs.map.w) as f32;
         let rect_h = (h / gs.map.h) as f32;
@@ -340,19 +345,22 @@ impl Screen {
 
             // Out of bounds or hit an object
             if let Some(htile) = gs.get_tile(cx as usize, cy as usize) {
-                // Call function on hit.
-                // TODO: Abstract to function to handle cases where no key
-                let Some(texture) = &textures.get_tile(htile) else {
-                    bail!("No texture for hit tile {htile:?}")
-                };
-                f_hit(self, texture, RayHit { cx, cy, dst });
-                break;
+                return Ok((htile, RayHit { cx, cy, dst }));
             };
 
             dst += INC
         }
-        Ok(dst)
     }
+
+    // pub fn draw_floor_ceiling(
+    //     &mut self,
+
+    //     gs: &GameState,
+    //     textures: &Textures,
+    // ) -> eyre::Result<()> {
+
+    //     Ok(())
+    // }
 
     /// # Generate the field-of-view of the player
     /// ```no_run
@@ -381,81 +389,133 @@ impl Screen {
     pub fn draw_fov(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
         let (w, h) = (self.buffer.width(), self.buffer.height());
         let fw: f32 = w as f32;
+
+        // To convert an angle in radians to a vector
+        // https://math.stackexchange.com/a/295827
+        // Someone also noted how inconvenient the lodev impl was and figured a better way lol
+        // https://github.com/almushel/raycast-demo#setting-the-camera-direction
+        let dir_x = gs.player.angle.cos();
+        let dir_y = gs.player.angle.sin();
+        let (plane_x, plane_y) = {
+            let angle = -PI / 2.;
+            (
+                (dir_x * angle.cos() - dir_y * angle.sin()) * gs.player.fov,
+                (dir_x * angle.sin() + dir_y * angle.cos()) * gs.player.fov,
+            )
+        };
+        let ray_dir_x0 = dir_x - plane_x;
+        let ray_dir_y0 = dir_y - plane_y;
+        let ray_dir_x1 = dir_x + plane_x;
+        let ray_dir_y1 = dir_y + plane_y;
+
+        let h_i = h as i32;
+        let texture_size = textures.size as f32;
+        for y in h_i / 2 + 1..h_i {
+            let p = y - h_i / 2;
+            let pos_z = 0.5 * h_i as f32;
+            let row_dst = pos_z / p as f32;
+            let floor_step_x = row_dst * (ray_dir_x1 - ray_dir_x0) / w as f32;
+            let floor_step_y = row_dst * (ray_dir_y1 - ray_dir_y0) / w as f32;
+
+            let mut floor_x = gs.player.x + row_dst * ray_dir_x0;
+            let mut floor_y = gs.player.y + row_dst * ray_dir_y0;
+            for x in 0..w {
+                let cell_x = floor_x as usize;
+                let cell_y = floor_y as usize;
+
+                let tx = ((texture_size * (floor_x - cell_x as f32).clamp(0.0, 1.0)) as usize)
+                    .clamp(0, textures.size - 1);
+                let ty = ((texture_size * (floor_y - cell_y as f32).clamp(0.0, 1.0)) as usize)
+                    .clamp(0, textures.size - 1);
+
+                floor_x += floor_step_x;
+                floor_y += floor_step_y;
+
+                let floor_texture = &textures.floor;
+                let Some(floor_color) = floor_texture.get_color(tx, ty) else {
+                    bail!("No texture for floor ({tx}, {ty})")
+                };
+                draw_pixel(&mut self.buffer, x, y as usize, floor_color);
+
+                let ceiling_texture = &textures.ceiling;
+                let Some(ceilng_color) = ceiling_texture.get_color(tx, ty) else {
+                    bail!("No texture for ceiling ({tx}, {ty})")
+                };
+                draw_pixel(&mut self.buffer, x, (h_i - y - 1) as usize, ceilng_color);
+            }
+        }
+
         // Angle between x-axis and fov
         // Direction - (FOV / 2)
         let pt_1 = gs.player.angle - gs.player.fov / 2.;
-        for i in 0..w {
+        // Draw at every angle within FOV
+        for col_x in 0..w {
             // The rest of the FOV angle drawn section by section.
             // (FOV * 0..512) / 512.
-            let pt_2 = gs.player.fov * (i as f32 / fw);
+            let pt_2 = gs.player.fov * (col_x as f32 / fw);
             let angle = pt_1 + pt_2;
-            self.draw_ray(
-                gs.player.x,
-                gs.player.y,
-                angle,
-                gs,
-                textures,
-                move |img, tile, ray_hit| {
-                    // Closer means smaller c and thus large ht.
-                    // We need to adjust this scaling to avoid fisheye distortion due to the ray hitting at multiple angles
-                    // See https://gamedev.stackexchange.com/a/97580
-                    // And https://lodev.org/cgtutor/raycasting.html
-                    let col_ht =
-                        (h as f32 / (ray_hit.dst * (angle - gs.player.angle).cos())) as usize;
-                    // Draw at every angle within FOV
-                    let col_x = i;
 
-                    // Store distance to know what to occlude from fov
-                    img.depth_buffer[i] = ray_hit.dst;
+            // Draw floor and ceiling
+            let (htile, ray_hit) = self.draw_ray(gs.player.x, gs.player.y, angle, gs)?;
 
-                    // Draw texture/tile
-                    match tile {
-                        Texture::Color(color) => {
-                            // Start at middle of screen and then drop y by half the col ht. This centers the drawn line.
-                            let col_y = h / 2 - col_ht / 2;
-                            draw_rect(&mut img.buffer, col_x, col_y, 1, col_ht, *color);
-                        }
-                        Texture::Sprite(sprite) => {
-                            let size = sprite.height() as f32;
-                            // We need to know whether we hit the x or y side of the texture.
-                            // hitx and hity contain (signed) fractional parts of cx and cy from 0.5 to -0.5
-                            // If hity (fractional part of y) magnitude larger, then "vertical" part of tile hit.
-                            //  hitx             hity
-                            //  *
-                            // ______              ______
-                            // |    |            * |    |
-                            // |____|              |____|
-                            let hitx = ray_hit.cx - (ray_hit.cx + 0.5).floor();
-                            let hity = ray_hit.cy - (ray_hit.cy + 0.5).floor();
-                            // Once know part of texture was hit, we can get what part of sprite to render from the size and fraction.
-                            let mut x_texcoord = if hity.abs() > hitx.abs() {
-                                hity * size
-                            } else {
-                                hitx * size
-                            };
-                            if x_texcoord < 0.0 {
-                                x_texcoord += size
-                            }
-                            assert!(x_texcoord >= 0.0 && x_texcoord < size);
+            let Some(texture) = &textures.get_tile(htile) else {
+                bail!("No texture for hit tile {htile:?}")
+            };
+            // Closer means smaller c and thus large ht.
+            // We need to adjust this scaling to avoid fisheye distortion due to the ray hitting at multiple angles
+            // See https://gamedev.stackexchange.com/a/97580
+            // And https://lodev.org/cgtutor/raycasting.html
+            let col_ht = (h as f32 / (ray_hit.dst * (angle - gs.player.angle).cos())) as usize;
 
-                            // Scale column to height.
-                            let mut texcol = Vec::with_capacity(col_ht);
-                            for y in 0..col_ht {
-                                let pix_y = (y as f32 * size) / col_ht as f32;
-                                texcol.push(sprite.get_pixel(x_texcoord as u32, pix_y as u32));
-                            }
-                            // Write scaled column
-                            for (j, px) in texcol.into_iter().enumerate().take(col_ht) {
-                                // Start at middle of screen ht, then half of the column ht. Add pixels to reach col_ht again.
-                                let Some(pix_y) = (j + (h / 2)).checked_sub(col_ht / 2) else {
-                                    continue;
-                                };
-                                draw_pixel(&mut img.buffer, col_x, pix_y, px)
-                            }
-                        }
+            // Store distance to know what to occlude from fov
+            self.depth_buffer[col_x] = ray_hit.dst;
+
+            // Draw texture/tile
+            match texture {
+                Texture::Color(color) => {
+                    // Start at middle of screen and then drop y by half the col ht. This centers the drawn line.
+                    let col_y = h / 2 - col_ht / 2;
+                    draw_rect(&mut self.buffer, col_x, col_y, 1, col_ht, *color);
+                }
+                Texture::Sprite(sprite) => {
+                    let size = sprite.height() as f32;
+                    // We need to know whether we hit the x or y side of the texture.
+                    // hitx and hity contain (signed) fractional parts of cx and cy from 0.5 to -0.5
+                    // If hity (fractional part of y) magnitude larger, then "vertical" part of tile hit.
+                    //  hitx             hity
+                    //  *
+                    // ______              ______
+                    // |    |            * |    |
+                    // |____|              |____|
+                    let hitx = ray_hit.cx - (ray_hit.cx + 0.5).floor();
+                    let hity = ray_hit.cy - (ray_hit.cy + 0.5).floor();
+                    // Once know part of texture was hit, we can get what part of sprite to render from the size and fraction.
+                    let mut x_texcoord = if hity.abs() > hitx.abs() {
+                        hity * size
+                    } else {
+                        hitx * size
                     };
-                },
-            )?;
+                    if x_texcoord < 0.0 {
+                        x_texcoord += size
+                    }
+                    assert!(x_texcoord >= 0.0 && x_texcoord < size);
+
+                    // Scale column to height.
+                    let mut texcol = Vec::with_capacity(col_ht);
+                    for y in 0..col_ht {
+                        let pix_y = (y as f32 * size) / col_ht as f32;
+                        texcol.push(sprite.get_pixel(x_texcoord as u32, pix_y as u32));
+                    }
+                    // Write scaled column
+                    for (j, px) in texcol.into_iter().enumerate().take(col_ht) {
+                        // Start at middle of screen ht, then half of the column ht. Add pixels to reach col_ht again.
+                        let Some(pix_y) = (j + (h / 2)).checked_sub(col_ht / 2) else {
+                            continue;
+                        };
+                        draw_pixel(&mut self.buffer, col_x, pix_y, px)
+                    }
+                }
+            }
         }
         Ok(())
     }

@@ -11,8 +11,8 @@ mod tiles;
 
 use crate::{screen::Screen, state::GameState, textures::Textures};
 
-const WIDTH: usize = 1024;
-const HEIGHT: usize = 512;
+const WIDTH: usize = 640;
+const HEIGHT: usize = 480;
 
 // https://github.com/not-fl3/macroquad/issues/380#issuecomment-4320788661
 fn window_conf() -> Conf {
@@ -35,7 +35,6 @@ async fn main() -> eyre::Result<()> {
     let fps_target = 60.0;
     let frame_dur = Duration::from_secs_f64(1.0 / fps_target);
     let mut next_tick = Instant::now();
-    // root_ui().window(hash!(), vec2(20., 250.), vec2(300., 300.), |_ui| {});
 
     loop {
         // Exit
