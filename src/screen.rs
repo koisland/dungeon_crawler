@@ -218,7 +218,10 @@ impl Screen {
         // https://stackoverflow.com/questions/283406/what-is-the-difference-between-atan-and-atan2-in-c
         // Use atan2 incase where x is negative. Allows getting angle with range across all 4 quadrants as opposed to 2 (1 and 4).
         // Angle of enemy relative to player
-        let mut angle = (enemy.y - player.y).atan2(enemy.x - player.x);
+        let sprite_x = enemy.x - player.x;
+        let sprite_y = enemy.y - player.y;
+
+        let mut angle = sprite_y.atan2(sprite_x);
         while angle - player.angle > PI {
             angle -= 2. * PI;
         } // remove unncesessary periods from the relative direction
@@ -446,14 +449,13 @@ impl Screen {
         }
 
         // Angle between x-axis and fov
-        // Direction - (FOV / 2)
-        let pt_1 = gs.player.angle - gs.player.fov / 2.;
         // Draw at every angle within FOV
         for col_x in 0..w {
             // The rest of the FOV angle drawn section by section.
-            // (FOV * 0..512) / 512.
-            let pt_2 = gs.player.fov * (col_x as f32 / fw);
-            let angle = pt_1 + pt_2;
+            let camera_x = 2.0 * col_x as f32 / fw - 1.0;
+            let ray_dir_x = dir_x + plane_x * camera_x;
+            let ray_dir_y = dir_y + plane_y * camera_x;
+            let angle = ray_dir_y.atan2(ray_dir_x);
 
             // Draw floor and ceiling
             let (htile, ray_hit) = self.draw_ray(gs.player.x, gs.player.y, angle, gs)?;
