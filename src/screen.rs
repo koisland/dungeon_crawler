@@ -107,12 +107,6 @@ impl Screen {
         let (w, h) = (self.buffer.width, self.buffer.height);
         let (mw, mh) = (self.map_buffer.width, self.map_buffer.height);
         self.buffer = Image::gen_image_color(w, h, WHITE);
-        // // Color top half dark gray
-        // for x in 0..w {
-        //     for y in 0..h/2 {
-        //         self.buffer.set_pixel(x as u32, y as u32, DARKGRAY);
-        //     }
-        // }
         self.map_buffer = Image::gen_image_color(mw, mh, WHITE);
     }
 
@@ -255,12 +249,10 @@ impl Screen {
                 continue;
             }
 
-            // Avoid float but get texture fraction
-            let tx_x = (256 * (x - draw_start_x) * texture_size / sprite_width) / 256;
+            let tx_x = (x - draw_start_x) * texture_size / sprite_width;
 
             for y in draw_start_y..draw_end_y {
-                let d = y * 256 - hi * 128 + sprite_height * 128;
-                let tx_y = ((d * texture_size) / sprite_height) / 256;
+                let tx_y = (y - draw_start_y) * texture_size / sprite_height;
                 let Some(color) = texture.get_color(tx_x as usize, tx_y as usize) else {
                     bail!("No color.")
                 };
@@ -279,11 +271,7 @@ impl Screen {
         for entity in gs
             .id_enemy_map
             .values()
-            .sorted_by(|a, b| {
-                let dst_a = a.dst_from_player(&gs.player);
-                let dst_b = b.dst_from_player(&gs.player);
-                dst_a.total_cmp(&dst_b)
-            })
+            .sorted_by(|a, b| a.dst.total_cmp(&b.dst))
             .rev()
         {
             self.draw_sprite(entity, &gs.player, textures)?;
