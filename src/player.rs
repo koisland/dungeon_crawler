@@ -49,6 +49,19 @@ impl Player {
         self.turn();
         self.walk(map);
     }
+
+    pub(crate) fn camera_info(&self) -> (f32, f32, f32, f32) {
+        let dir_x = self.angle.cos();
+        let dir_y = self.angle.sin();
+        let (plane_x, plane_y) = {
+            let angle = PI / 2.;
+            (
+                (dir_x * angle.cos() - dir_y * angle.sin()) * self.fov,
+                (dir_x * angle.sin() + dir_y * angle.cos()) * self.fov,
+            )
+        };
+        (dir_x, dir_y, plane_x, plane_y)
+    }
 }
 
 impl Default for Player {

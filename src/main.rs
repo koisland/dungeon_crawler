@@ -11,8 +11,8 @@ mod tiles;
 
 use crate::{screen::Screen, state::GameState, textures::Textures};
 
-const WIDTH: usize = 640;
-const HEIGHT: usize = 480;
+const WIDTH: usize = 1024;
+const HEIGHT: usize = 512;
 
 // https://github.com/not-fl3/macroquad/issues/380#issuecomment-4320788661
 fn window_conf() -> Conf {

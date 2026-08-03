@@ -1,5 +1,4 @@
 use std::{
-    f32::consts::PI,
     fs::File,
     io::{BufWriter, Write},
     path::Path,
@@ -220,55 +219,55 @@ impl Screen {
         // Angle of enemy relative to player
         let sprite_x = enemy.x - player.x;
         let sprite_y = enemy.y - player.y;
+        let (dir_x, dir_y, plane_x, plane_y) = player.camera_info();
 
-        let mut angle = sprite_y.atan2(sprite_x);
-        while angle - player.angle > PI {
-            angle -= 2. * PI;
-        } // remove unncesessary periods from the relative direction
-        while angle - player.angle < -PI {
-            angle += 2. * PI;
-        }
+        // inverse camera matrix
+        let inv_det = 1.0 / (plane_x * dir_y - dir_x * plane_y);
+        let transform_x = inv_det * (dir_y * sprite_x - dir_x * sprite_y);
+        let transform_y = inv_det * (-plane_y * sprite_x + plane_x * sprite_y);
+
+        let sprite_screen_x = ((w as f32 / 2.0) * (1.0 + transform_x / transform_y)) as i32;
+        let sprite_height = (h as f32 / transform_y).abs() as i32;
+        let sprite_width = sprite_height;
+
+        let texture_size = textures.size as i32;
+        let (wi, hi) = (w as i32, h as i32);
+        let draw_start_x = -sprite_width / 2 + sprite_screen_x;
+        let draw_end_x = (sprite_width / 2 + sprite_screen_x).min(wi - 1);
+        let draw_start_y = -sprite_height / 2 + hi / 2;
+        let draw_end_y = (sprite_height / 2 + hi / 2).min(hi - 1);
 
         let Some(texture) = textures.get_enemy(enemy) else {
             bail!("No texture for enemy {enemy:?}")
         };
-        // Scale sprite by distance from player and clamp to 2000 if very close.
-        let sprite_screen_size = ((h as f32 / enemy.dst) as usize).min(2000);
-        let h_offset = ((angle - player.angle) * w as f32 / (player.fov) + w as f32 / 2.
-            - sprite_screen_size as f32 / 2.) as i32; // do not forget the 3D view takes only a half of the framebuffer, thus fb.w/2 for the screen width
-        let v_offset = (h / 2 - sprite_screen_size / 2) as i32;
 
-        for i in 0..sprite_screen_size {
-            let i_int = i as i32;
-            let px_x = h_offset + i_int;
-            // Don't draw horizontal pixel if OOB
-            if px_x < 0 || px_x >= w as i32 {
-                continue;
-            }
-            // Occluded. Pixel at x-pos in front of sprite (closer).
-            if TryInto::<usize>::try_into(px_x).is_ok_and(|x| self.depth_buffer[x] < enemy.dst) {
+        for x in draw_start_x..draw_end_x {
+            // the conditions in the if are:
+            // 1) it's in front of camera plane so you don't see things behind you
+            // 2) it's on the screen (left)
+            // 3) it's on the screen (right)
+            // 4) ZBuffer, with perpendicular distance
+            if !(TryInto::<usize>::try_into(x).is_ok_and(|x| transform_y < self.depth_buffer[x])
+                && transform_y > 0.0
+                && x > 0
+                && x < wi)
+            {
                 continue;
             }
 
-            for j in 0..sprite_screen_size {
-                let j_int = j as i32;
-                let px_y = v_offset + j_int;
-                if px_y < 0 || px_y >= h as i32 {
-                    continue;
-                }
-                let Some(color) = texture.get_color(
-                    i * textures.size / sprite_screen_size,
-                    j * textures.size / sprite_screen_size,
-                ) else {
+            // Avoid float but get texture fraction
+            let tx_x = (256 * (x - draw_start_x) * texture_size / sprite_width) / 256;
+
+            for y in draw_start_y..draw_end_y {
+                let d = y * 256 - hi * 128 + sprite_height * 128;
+                let tx_y = ((d * texture_size) / sprite_height) / 256;
+                let Some(color) = texture.get_color(tx_x as usize, tx_y as usize) else {
                     bail!("No color.")
                 };
-
                 // Only draw opaque pixels
                 // https://colorlabs.net/posts/what-are-alpha-channels-in-digital-images
                 if color.a > 0.5 {
-                    let px_x = px_x as usize;
-                    let px_y = px_y as usize;
-                    draw_pixel(&mut self.buffer, px_x, px_y, color)
+                    draw_pixel(&mut self.buffer, x as usize, y as usize, color)
                 }
             }
         }
@@ -397,15 +396,7 @@ impl Screen {
         // https://math.stackexchange.com/a/295827
         // Someone also noted how inconvenient the lodev impl was and figured a better way lol
         // https://github.com/almushel/raycast-demo#setting-the-camera-direction
-        let dir_x = gs.player.angle.cos();
-        let dir_y = gs.player.angle.sin();
-        let (plane_x, plane_y) = {
-            let angle = -PI / 2.;
-            (
-                (dir_x * angle.cos() - dir_y * angle.sin()) * gs.player.fov,
-                (dir_x * angle.sin() + dir_y * angle.cos()) * gs.player.fov,
-            )
-        };
+        let (dir_x, dir_y, plane_x, plane_y) = gs.player.camera_info();
         let ray_dir_x0 = dir_x - plane_x;
         let ray_dir_y0 = dir_y - plane_y;
         let ray_dir_x1 = dir_x + plane_x;
