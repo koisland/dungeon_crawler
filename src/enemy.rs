@@ -6,15 +6,15 @@ use crate::player::Player;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum EnemyType {
-    RedBlob,
-    Demon,
+    Orc,
+    Imp,
 }
 
 impl From<EnemyType> for char {
     fn from(value: EnemyType) -> Self {
         match value {
-            EnemyType::RedBlob => 'a',
-            EnemyType::Demon => 'b',
+            EnemyType::Orc => 'a',
+            EnemyType::Imp => 'b',
         }
     }
 }
@@ -24,8 +24,8 @@ impl FromStr for EnemyType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "red_blob" => EnemyType::RedBlob,
-            "demon" => EnemyType::Demon,
+            "orc" => EnemyType::Orc,
+            "imp" => EnemyType::Imp,
             _ => bail!("Invalid string for enemy type {s}"),
         })
     }

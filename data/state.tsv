@@ -1,6 +1,4 @@
 #type	lbl	state	x	y	angle
-enemy	demon	base	3.523	3.812	0.0
-enemy	red_blob	base	1.834	8.765	0.0
-enemy	red_blob	injured	5.323	5.365	0.0
-enemy	red_blob	injured	4.123	10.265	0.0
-player	doom_guy	base	3.456	2.345	1.523
+enemy	imp	base	3.523	3.812	0.0
+enemy	orc	base	1.834	8.765	0.0
+player	.	base	3.456	2.345	1.523

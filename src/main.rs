@@ -28,7 +28,7 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() -> eyre::Result<()> {
     let mut gs = GameState::new("data/map.txt", "data/state.tsv")?;
-    let textures = Textures::new("data/textures.tsv", 64)?;
+    let textures = Textures::new("data/textures.tsv", 32)?;
     let mut screen = Screen::new(WIDTH, HEIGHT, gs.map.w * 10, gs.map.h * 10);
 
     // https://github.com/not-fl3/macroquad/issues/380#issuecomment-4775299639

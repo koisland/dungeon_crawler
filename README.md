@@ -1,14 +1,20 @@
 # dungeon_crawler
 A simple dungeon crawler built in `macroquad`.
 
+![](docs/dungeon_crawler.png)
+
 ## Usage
 ```bash
 cargo run --release
 ```
 
+## Assets
+* https://sethbb.itch.io/32rogues
+
 ## TO-DO
 * [x] Extend by also doing floor and ceiling.
 * [ ] Dungeon crawler
+* [ ] Switch to turn-based
 
 ## References
 * https://github.com/ssloy/tinyraycaster

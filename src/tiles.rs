@@ -5,11 +5,11 @@ use eyre::bail;
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum TileType {
     Rock,
-    GrayBrick,
+    Dirt,
     RedBrick,
     Door,
-    GreenRock,
-    GreenHex,
+    SolidRock,
+    Brick,
 }
 
 impl TryFrom<char> for TileType {
@@ -18,11 +18,11 @@ impl TryFrom<char> for TileType {
     fn try_from(value: char) -> Result<Self, Self::Error> {
         Ok(match value {
             '0' => TileType::Rock,
-            '1' => TileType::GrayBrick,
+            '1' => TileType::Dirt,
             '2' => TileType::RedBrick,
             '3' => TileType::Door,
-            '4' => TileType::GreenRock,
-            '5' => TileType::GreenHex,
+            '4' => TileType::SolidRock,
+            '5' => TileType::Brick,
             _ => bail!("Invalid tile type. {value}"),
         })
     }
@@ -32,11 +32,11 @@ impl From<TileType> for char {
     fn from(value: TileType) -> Self {
         match value {
             TileType::Rock => '0',
-            TileType::GrayBrick => '1',
+            TileType::Dirt => '1',
             TileType::RedBrick => '2',
             TileType::Door => '3',
-            TileType::GreenRock => '4',
-            TileType::GreenHex => '5',
+            TileType::SolidRock => '4',
+            TileType::Brick => '5',
         }
     }
 }
@@ -47,11 +47,11 @@ impl FromStr for TileType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "rock" => TileType::Rock,
-            "gray_brick" => TileType::GrayBrick,
+            "dirt" => TileType::Dirt,
             "red_brick" => TileType::RedBrick,
             "door" => TileType::Door,
-            "green_rock" => TileType::GreenRock,
-            "green_hex" => TileType::GreenHex,
+            "solid_rock" => TileType::SolidRock,
+            "brick" => TileType::Brick,
             _ => bail!("Invalid tile type {s}"),
         })
     }
