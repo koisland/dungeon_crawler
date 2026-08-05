@@ -5,7 +5,7 @@
 
 2.a. chimpanzee
 2.b. gorilla
-3.c. orangutan
+2.c. orangutan
 
 4.a. aye aye
 4.b. gibbon
@@ -69,6 +69,7 @@
 11.f. llama
 11.g. pig
 11.h. boar
+
 12.a. camel
 12.b. reindeer/caribou
 12.c. water buffalo
@@ -98,4 +99,4 @@
 17.b. mountain goat
 17.c. ibex
 17.d. sheep (ram)
-16.e. sheep (ewe)
+17.e. sheep (ewe)

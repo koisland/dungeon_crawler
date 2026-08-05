@@ -1,3 +1,7 @@
 /target
 *.ppm
 *.gz
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+.vscode

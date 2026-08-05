@@ -1,0 +1,14 @@
+[workspace]
+authors = ["Keith <koshima789@gmail.com>"]
+channels = ["conda-forge"]
+name = "tinyraycaster"
+platforms = ["win-64"]
+version = "0.1.0"
+
+[tasks]
+images = "python data/split_images.py"
+clean_images = "rm -rf ./data/*_tiles"
+
+[dependencies]
+pillow = ">=12.3.0,<13"
+ruff = ">=0.16.1,<0.17"

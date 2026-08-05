@@ -34,7 +34,6 @@
 8.f. grass 2 (no bg)
 8.g. grass 3 (no bg)
 
-
 9.a. empty
 9.b. dirt 1
 9.c. dirt 2
@@ -66,7 +65,6 @@
 12.e. red stone floor 1 (no bg)
 12.f. red stone floor 2 (no bg)
 12.g. red stone floor 3 (no bg)
-
 
 13.a. blank blue floor
 13.b. blue stone floor 1 (blue bg)
@@ -151,6 +149,7 @@
 24.d. sarcophagus (closed)
 24.e. sarcophagus (ajar)
 24.f. sarcophagus (open)
+
 
 26.a. sapling
 26.b. small tree
