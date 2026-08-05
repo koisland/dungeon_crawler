@@ -1,9 +1,11 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fs::File,
     io::{BufRead, BufReader},
     str::FromStr,
 };
+
+use rustc_hash::FxHashMap;
 
 use crate::{
     enemy::{Enemy, EnemyState, EnemyType},
@@ -23,11 +25,11 @@ pub struct GameState {
     pub player: Player,
     // Tiles
     // tile position to id
-    pub tile_pos_id_map: HashMap<(usize, usize), usize>,
+    pub tile_pos_id_map: FxHashMap<(usize, usize), usize>,
     pub id_tile_map: BTreeMap<usize, Tile>,
     // Enemy
     // enemy position to id
-    pub enemy_pos_id_map: HashMap<(usize, usize), usize>,
+    pub enemy_pos_id_map: FxHashMap<(usize, usize), usize>,
     pub id_enemy_map: BTreeMap<usize, Enemy>,
 }
 
