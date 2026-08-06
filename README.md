@@ -13,8 +13,15 @@ cargo run --release
 
 ## TO-DO
 * [x] Extend by also doing floor and ceiling.
-* [ ] Dungeon crawler
-* [ ] Switch to turn-based
+* [x] Fog
+* [ ] Player velocity
+* [ ] Weapons
+* [ ] Enemies
+* [ ] Collision detection
+* [ ] Doors
+* [ ] Directional sprites
+* [ ] Levels
+* [ ] Items
 
 ## References
 * https://github.com/ssloy/tinyraycaster

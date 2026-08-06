@@ -10,11 +10,13 @@ use macroquad::prelude::*;
 
 use crate::{
     enemy::Enemy,
-    player::Player,
     state::GameState,
     textures::{Texture, Textures},
     tiles::Tile,
 };
+
+// TODO: Can change based on level
+const FOG_COLOR: Color = BLACK;
 
 pub struct RayHit {
     // x coord hit by ray
@@ -67,6 +69,17 @@ pub fn draw_image(buffer: &mut Image, x: usize, y: usize, image: &Image) {
             draw_pixel(buffer, cx, cy, px)
         }
     }
+}
+
+// https://lodev.org/cgtutor/raycasting4.html
+pub fn add_fog_to_color(color: &Color, color_fog: &Color, perc_fog: f32) -> Color {
+    let perc_color = 1.0 - perc_fog;
+    Color::new(
+        (color.r * perc_color) + (color_fog.r * perc_fog),
+        (color.g * perc_color) + (color_fog.g * perc_fog),
+        (color.b * perc_color) + (color_fog.b * perc_fog),
+        (color.a * perc_color) + (color_fog.a * perc_fog),
+    )
 }
 
 // Based on https://kwojcicki.github.io/blog/NEAREST-NEIGHBOUR
@@ -203,16 +216,21 @@ impl Screen {
     pub fn draw_sprite(
         &mut self,
         enemy: &Enemy,
-        player: &Player,
+        gs: &GameState,
         textures: &Textures,
     ) -> eyre::Result<()> {
+        let player = &gs.player;
         let (w, h) = (self.buffer.width(), self.buffer.height());
+        let map_max_len = std::cmp::max(gs.map.w, gs.map.h) as f32;
+
         // https://www.youtube.com/watch?v=VMYk9fqXz_4
         // https://stackoverflow.com/questions/283406/what-is-the-difference-between-atan-and-atan2-in-c
         // Use atan2 incase where x is negative. Allows getting angle with range across all 4 quadrants as opposed to 2 (1 and 4).
         // Angle of enemy relative to player
         let sprite_x = enemy.x - player.x;
         let sprite_y = enemy.y - player.y;
+        let perc_fog = enemy.dst / map_max_len;
+
         let (dir_x, dir_y, plane_x, plane_y) = player.camera_info();
 
         // inverse camera matrix
@@ -259,7 +277,8 @@ impl Screen {
                 // Only draw opaque pixels
                 // https://colorlabs.net/posts/what-are-alpha-channels-in-digital-images
                 if color.a > 0.5 {
-                    draw_pixel(&mut self.buffer, x as usize, y as usize, color)
+                    let new_color = add_fog_to_color(&color, &FOG_COLOR, perc_fog);
+                    draw_pixel(&mut self.buffer, x as usize, y as usize, new_color)
                 }
             }
         }
@@ -274,7 +293,7 @@ impl Screen {
             .sorted_by(|a, b| a.dst.total_cmp(&b.dst))
             .rev()
         {
-            self.draw_sprite(entity, &gs.player, textures)?;
+            self.draw_sprite(entity, gs, textures)?;
         }
         Ok(())
     }
@@ -380,6 +399,9 @@ impl Screen {
         let (w, h) = (self.buffer.width(), self.buffer.height());
         let fw: f32 = w as f32;
 
+        // Get largest distance on map
+        let map_max_len = std::cmp::max(gs.map.w, gs.map.h) as f32;
+
         // To convert an angle in radians to a vector
         // https://math.stackexchange.com/a/295827
         // Someone also noted how inconvenient the lodev impl was and figured a better way lol
@@ -396,6 +418,9 @@ impl Screen {
             let p = y - h_i / 2;
             let pos_z = 0.5 * h_i as f32;
             let row_dst = pos_z / p as f32;
+            // Scale fog
+            let perc_fog = row_dst / map_max_len;
+
             let floor_step_x = row_dst * (ray_dir_x1 - ray_dir_x0) / w as f32;
             let floor_step_y = row_dst * (ray_dir_y1 - ray_dir_y0) / w as f32;
 
@@ -417,13 +442,20 @@ impl Screen {
                 let Some(floor_color) = floor_texture.get_color(tx, ty) else {
                     bail!("No texture for floor ({tx}, {ty})")
                 };
-                draw_pixel(&mut self.buffer, x, y as usize, floor_color);
+                let new_floor_color = add_fog_to_color(&floor_color, &FOG_COLOR, perc_fog);
+                draw_pixel(&mut self.buffer, x, y as usize, new_floor_color);
 
                 let ceiling_texture = &textures.ceiling;
-                let Some(ceilng_color) = ceiling_texture.get_color(tx, ty) else {
+                let Some(ceiling_color) = ceiling_texture.get_color(tx, ty) else {
                     bail!("No texture for ceiling ({tx}, {ty})")
                 };
-                draw_pixel(&mut self.buffer, x, (h_i - y - 1) as usize, ceilng_color);
+                let new_ceiling_color = add_fog_to_color(&ceiling_color, &FOG_COLOR, perc_fog);
+                draw_pixel(
+                    &mut self.buffer,
+                    x,
+                    (h_i - y - 1) as usize,
+                    new_ceiling_color,
+                );
             }
         }
 
@@ -438,6 +470,9 @@ impl Screen {
 
             // Draw floor and ceiling
             let (htile, ray_hit) = self.draw_ray(gs.player.x, gs.player.y, angle, gs)?;
+
+            // Calculate fog percent (0-1.0)
+            let perc_fog = ray_hit.dst / map_max_len;
 
             let Some(texture) = &textures.get_tile(htile) else {
                 bail!("No texture for hit tile {htile:?}")
@@ -456,7 +491,8 @@ impl Screen {
                 Texture::Color(color) => {
                     // Start at middle of screen and then drop y by half the col ht. This centers the drawn line.
                     let col_y = h / 2 - col_ht / 2;
-                    draw_rect(&mut self.buffer, col_x, col_y, 1, col_ht, *color);
+                    let new_color = add_fog_to_color(color, &FOG_COLOR, perc_fog);
+                    draw_rect(&mut self.buffer, col_x, col_y, 1, col_ht, new_color);
                 }
                 Texture::Sprite(sprite) => {
                     let size = sprite.height() as f32;
@@ -493,7 +529,8 @@ impl Screen {
                         let Some(pix_y) = (j + (h / 2)).checked_sub(col_ht / 2) else {
                             continue;
                         };
-                        draw_pixel(&mut self.buffer, col_x, pix_y, px)
+                        let new_color = add_fog_to_color(&px, &FOG_COLOR, perc_fog);
+                        draw_pixel(&mut self.buffer, col_x, pix_y, new_color)
                     }
                 }
             }

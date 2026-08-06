@@ -74,6 +74,6 @@ pub struct Enemy {
 impl Enemy {
     pub fn dst_from_player(&self, player: &Player) -> f32 {
         // pythagorean theorem
-        (player.x - self.x).powi(2) + (player.y - self.y).powi(2)
+        ((player.x - self.x).powi(2) + (player.y - self.y).powi(2)).sqrt()
     }
 }
