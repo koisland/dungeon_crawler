@@ -5,8 +5,6 @@ use std::{
     str::FromStr,
 };
 
-use rustc_hash::FxHashMap;
-
 use crate::{
     enemy::{Enemy, EnemyState, EnemyType},
     map::Map,
@@ -24,12 +22,8 @@ pub struct GameState {
     // Player
     pub player: Player,
     // Tiles
-    // tile position to id
-    pub tile_pos_id_map: FxHashMap<(usize, usize), usize>,
     pub id_tile_map: BTreeMap<usize, Tile>,
-    // Enemy
-    // enemy position to id
-    pub enemy_pos_id_map: FxHashMap<(usize, usize), usize>,
+    // Enemies
     pub id_enemy_map: BTreeMap<usize, Enemy>,
 }
 
@@ -95,7 +89,8 @@ impl GameState {
     }
 
     pub fn get_tile(&self, x: usize, y: usize) -> Option<&Tile> {
-        self.tile_pos_id_map
+        self.map
+            .tiles
             .get(&(x, y))
             .and_then(|id| self.id_tile_map.get(id))
     }
@@ -106,15 +101,17 @@ impl GameState {
 
     pub fn spawn_tile(&mut self, tile: Tile) {
         let tid = self.id_tile_map.len();
-        self.tile_pos_id_map.insert((tile.x, tile.y), tid);
+        self.map.tiles.insert((tile.x, tile.y), tid);
         self.id_tile_map.insert(tid, tile);
     }
 
     pub fn spawn_enemy(&mut self, enemy: Enemy) {
         let eid = self.id_enemy_map.len();
-        // TODO: This should change
-        self.enemy_pos_id_map
-            .insert((enemy.x as usize, enemy.y as usize), eid);
+        self.map
+            .enemies
+            .entry((enemy.x as usize, enemy.y as usize))
+            .and_modify(|enemies| enemies.push(eid))
+            .or_default();
         self.id_enemy_map.insert(eid, enemy);
     }
 

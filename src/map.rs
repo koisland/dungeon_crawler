@@ -1,4 +1,4 @@
-use eyre::bail;
+use rustc_hash::FxHashMap;
 
 use std::{
     fs::File,
@@ -12,9 +12,14 @@ use crate::{
 
 #[derive(Default)]
 pub struct Map {
-    pub src: String,
+    // This should change to a vec<Tile>
     pub w: usize,
     pub h: usize,
+    // Store only position to ids.
+    // Then can query enemy/tile in gamestate
+    pub tiles: FxHashMap<(usize, usize), usize>,
+    // Multiple enemies can be on a single tile
+    pub enemies: FxHashMap<(usize, usize), Vec<usize>>,
 }
 
 impl Map {
@@ -42,11 +47,10 @@ impl Map {
                 };
 
                 let eid = state.id_tile_map.len();
-                state.tile_pos_id_map.insert((x, h), eid);
+                map.tiles.insert((x, h), eid);
                 state.id_tile_map.insert(eid, tile);
             }
 
-            map.src.push_str(line);
             // eprintln!("{line} ({w}, {h})");
             // Only check at end. Could also do here and give failing line
             map_w = w;
@@ -54,9 +58,6 @@ impl Map {
             map_h = h + 1;
         }
 
-        if map_w * map_h != map.src.len() {
-            bail!("Map does not have uniform length and width");
-        }
         map.w = map_w;
         map.h = map_h;
         Ok(map)
@@ -71,6 +72,6 @@ impl Map {
     }
 
     pub fn is_empty(&self, x: usize, y: usize) -> bool {
-        self.src.as_bytes()[y * self.w + x] == b' '
+        self.tiles.contains_key(&(x, y))
     }
 }
