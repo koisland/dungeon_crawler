@@ -72,6 +72,6 @@ impl Map {
     }
 
     pub fn is_empty(&self, x: usize, y: usize) -> bool {
-        self.tiles.contains_key(&(x, y))
+        !self.tiles.contains_key(&(x, y))
     }
 }
