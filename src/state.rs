@@ -117,26 +117,29 @@ impl GameState {
 
     pub fn update_all(&mut self) {
         // Stop walking and turning
-        if is_key_released(KeyCode::W)
-            || is_key_released(KeyCode::A)
-            || is_key_released(KeyCode::S)
-            || is_key_released(KeyCode::D)
-        {
+        if is_key_released(KeyCode::A) || is_key_released(KeyCode::D) {
             self.player.turn = TurnState::Stop;
-            self.player.walk = WalkState::Stop;
         }
+        if is_key_released(KeyCode::W) {
+            self.player.accelerate(-0.1);
+        }
+
         if is_key_down(KeyCode::W) {
-            self.player.walk = WalkState::Forward
+            self.player.walk = WalkState::Forward;
+            self.player.accelerate(0.7);
         }
         if is_key_down(KeyCode::A) {
             self.player.turn = TurnState::Left
         }
         if is_key_down(KeyCode::S) {
-            self.player.walk = WalkState::Reverse
+            self.player.walk = WalkState::Reverse;
+            self.player.accelerate(0.2);
         }
         if is_key_down(KeyCode::D) {
             self.player.turn = TurnState::Right
         }
+        self.player.accelerate(-0.03);
+
         // Update player position
         self.player.update(&self.map);
         // Update enemies

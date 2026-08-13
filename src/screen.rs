@@ -298,6 +298,9 @@ impl Screen {
         Ok(())
     }
 
+    // TODO: Refactor and move out of screen to allow use elsewhere (collision detection). Probably to Map.
+    // TODO: Change name to cast_ray()
+    // TODO: Allow optional closure to update screen?
     /// # Drawing a ray.
     /// Our diagram of the player in space looks like this.
     /// ```no_run

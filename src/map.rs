@@ -12,7 +12,6 @@ use crate::{
 
 #[derive(Default)]
 pub struct Map {
-    // This should change to a vec<Tile>
     pub w: usize,
     pub h: usize,
     // Store only position to ids.
@@ -51,8 +50,6 @@ impl Map {
                 state.id_tile_map.insert(eid, tile);
             }
 
-            // eprintln!("{line} ({w}, {h})");
-            // Only check at end. Could also do here and give failing line
             map_w = w;
             // 0-index
             map_h = h + 1;

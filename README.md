@@ -14,7 +14,7 @@ cargo run --release
 ## TO-DO
 * [x] Extend by also doing floor and ceiling.
 * [x] Fog
-* [ ] Player velocity
+* [x] Player acceleration
 * [ ] Weapons
 * [ ] Enemies
 * [ ] Collision detection

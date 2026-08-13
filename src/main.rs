@@ -37,13 +37,6 @@ async fn main() -> eyre::Result<()> {
     let mut next_tick = Instant::now();
 
     loop {
-        // Exit
-        if is_key_down(KeyCode::Escape) || is_quit_requested() {
-            break Ok(());
-        }
-        // Update state
-        gs.update_all();
-
         // Limit FPS
         next_tick += frame_dur;
         let now = Instant::now();
@@ -52,6 +45,14 @@ async fn main() -> eyre::Result<()> {
         } else {
             next_tick = now; // catch up after a slow frame
         }
+
+        // Exit
+        if is_key_down(KeyCode::Escape) || is_quit_requested() {
+            break Ok(());
+        }
+        // Update state
+        gs.update_all();
+
         // Render frame
         screen.render(&gs, &textures)?;
 
