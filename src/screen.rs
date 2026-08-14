@@ -10,22 +10,13 @@ use macroquad::prelude::*;
 
 use crate::{
     enemy::Enemy,
+    ray::cast_ray_to_tile,
     state::GameState,
     textures::{Texture, Textures},
-    tiles::Tile,
 };
 
 // TODO: Can change based on level
 const FOG_COLOR: Color = BLACK;
-
-pub struct RayHit {
-    // x coord hit by ray
-    cx: f32,
-    // y coord hit by ray
-    cy: f32,
-    // Distance from player to hit tile
-    dst: f32,
-}
 
 // Store image in 1D array.
 // Access elems by specify w + (h * WIDTH)
@@ -119,7 +110,7 @@ impl Screen {
     pub fn clear(&mut self) {
         let (w, h) = (self.buffer.width, self.buffer.height);
         let (mw, mh) = (self.map_buffer.width, self.map_buffer.height);
-        self.buffer = Image::gen_image_color(w, h, WHITE);
+        self.buffer = Image::gen_image_color(w, h, BLACK);
         self.map_buffer = Image::gen_image_color(mw, mh, WHITE);
     }
 
@@ -149,8 +140,8 @@ impl Screen {
         let rect_w = self.map_buffer.width() / gs.map.w;
         let rect_h = self.map_buffer.height() / gs.map.h;
 
-        for (x, y, tile) in gs.get_tiles() {
-            if let Some(tile) = tile {
+        for (x, y) in gs.map.visible.iter().cloned() {
+            if let Some(tile) = gs.get_tile(x, y) {
                 // Because each rect is w and h
                 let rect_x = x * rect_w;
                 let rect_y = y * rect_h;
@@ -158,7 +149,6 @@ impl Screen {
                     bail!("Tile {tile:?} has no texture.")
                 };
 
-                // eprintln!("At ({x},{y}) draw {tile:?} tile at ({rect_x}, {rect_y}) ");
                 match texture {
                     Texture::Color(color) => {
                         draw_rect(&mut self.map_buffer, rect_x, rect_y, rect_w, rect_h, *color);
@@ -170,7 +160,6 @@ impl Screen {
                     }
                 };
             }
-            continue;
         }
         self.draw_player_on_map(gs)?;
         self.draw_entities_on_map(gs)?;
@@ -198,7 +187,11 @@ impl Screen {
         let rect_w = self.map_buffer.width() / gs.map.w;
         let rect_h = self.map_buffer.height() / gs.map.h;
 
-        for entity in gs.id_enemy_map.values() {
+        for entity in gs
+            .id_enemy_map
+            .values()
+            .filter(|e| e.dst <= gs.player.visibility)
+        {
             let x = (entity.x * rect_w as f32) as usize;
             let y = (entity.y * rect_h as f32) as usize;
             draw_rect(
@@ -221,7 +214,6 @@ impl Screen {
     ) -> eyre::Result<()> {
         let player = &gs.player;
         let (w, h) = (self.buffer.width(), self.buffer.height());
-        let map_max_len = std::cmp::max(gs.map.w, gs.map.h) as f32;
 
         // https://www.youtube.com/watch?v=VMYk9fqXz_4
         // https://stackoverflow.com/questions/283406/what-is-the-difference-between-atan-and-atan2-in-c
@@ -229,7 +221,7 @@ impl Screen {
         // Angle of enemy relative to player
         let sprite_x = enemy.x - player.x;
         let sprite_y = enemy.y - player.y;
-        let perc_fog = enemy.dst / map_max_len;
+        let perc_fog = enemy.dst / gs.player.visibility;
 
         let (dir_x, dir_y, plane_x, plane_y) = player.camera_info();
 
@@ -290,78 +282,14 @@ impl Screen {
         for entity in gs
             .id_enemy_map
             .values()
+            // TODO: Also check if facing same direction and if occluded.
+            .filter(|e| e.dst <= gs.player.visibility)
             .sorted_by(|a, b| a.dst.total_cmp(&b.dst))
             .rev()
         {
             self.draw_sprite(entity, gs, textures)?;
         }
         Ok(())
-    }
-
-    // TODO: Refactor and move out of screen to allow use elsewhere (collision detection). Probably to Map.
-    // TODO: Change name to cast_ray()
-    // TODO: Allow optional closure to update screen?
-    /// # Drawing a ray.
-    /// Our diagram of the player in space looks like this.
-    /// ```no_run
-    ///  a
-    /// ___
-    /// \p |
-    ///  \ | b
-    /// c \|
-    ///    (x, y)
-    /// ```
-    ///
-    /// Remember soh-cah-toa? This allows us to calculate `x` and `y` from `p_angle` (`ang`).
-    /// * `cos(p_angle) = a/c` which also is `a = c * cos(p_angle)`
-    /// * `sin(p_angle) = b/c` which also is `b = c * cos(p_angle)`
-    ///
-    /// So:
-    /// * `x` and `y` is the endpoint of the ray (hypotenuse of c) along the triangle.
-    /// * `c` is some arbitrary value representing the distance from object hit by ray
-    ///
-    /// Thus:
-    /// * `x = p_x + c * cos(p_angle)`
-    /// * `y = p_y + c * sin(p_angle)`
-    ///
-    /// This function returns the distance (length of c) to the endpoint of the ray.
-    pub fn draw_ray<'a>(
-        &mut self,
-        x: f32,
-        y: f32,
-        ang: f32,
-        gs: &'a GameState,
-    ) -> eyre::Result<(&'a Tile, RayHit)> {
-        let (w, h) = (self.map_buffer.width(), self.map_buffer.height());
-        let rect_w = (w / gs.map.w) as f32;
-        let rect_h = (h / gs.map.h) as f32;
-
-        // We don't include a limit (20) unlike the src
-        const INC: f32 = 0.01;
-        let mut dst: f32 = 0.0;
-        loop {
-            let cx = x + dst * ang.cos();
-            let cy = y + dst * ang.sin();
-
-            // Otherwise, draw ray
-            let px_x = cx * rect_w;
-            let px_y = cy * rect_h;
-            draw_rect(
-                &mut self.map_buffer,
-                px_x as usize,
-                px_y as usize,
-                1,
-                1,
-                Color::from_rgba(190, 190, 190, 255),
-            );
-
-            // Out of bounds or hit an object
-            if let Some(htile) = gs.get_tile(cx as usize, cy as usize) {
-                return Ok((htile, RayHit { cx, cy, dst }));
-            };
-
-            dst += INC
-        }
     }
 
     // pub fn draw_floor_ceiling(
@@ -398,12 +326,9 @@ impl Screen {
     /// * They contain (signed) fractional parts of cx and cy (endpoint coordinates of the ray) from 0.5 to -0.5
     /// * The large magnitude indicates that it is the one hit. We can get the coordinate in sprite space as a result.
     /// * Then we draw it.
-    pub fn draw_fov(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
+    pub fn draw_fov(&mut self, gs: &mut GameState, textures: &Textures) -> eyre::Result<()> {
         let (w, h) = (self.buffer.width(), self.buffer.height());
         let fw: f32 = w as f32;
-
-        // Get largest distance on map
-        let map_max_len = std::cmp::max(gs.map.w, gs.map.h) as f32;
 
         // To convert an angle in radians to a vector
         // https://math.stackexchange.com/a/295827
@@ -422,7 +347,7 @@ impl Screen {
             let pos_z = 0.5 * h_i as f32;
             let row_dst = pos_z / p as f32;
             // Scale fog
-            let perc_fog = row_dst / map_max_len;
+            let perc_fog = row_dst / gs.player.visibility;
 
             let floor_step_x = row_dst * (ray_dir_x1 - ray_dir_x0) / w as f32;
             let floor_step_y = row_dst * (ray_dir_y1 - ray_dir_y0) / w as f32;
@@ -472,12 +397,12 @@ impl Screen {
             let angle = ray_dir_y.atan2(ray_dir_x);
 
             // Draw floor and ceiling
-            let (htile, ray_hit) = self.draw_ray(gs.player.x, gs.player.y, angle, gs)?;
+            let (htile, ray_hit) = cast_ray_to_tile(gs.player.x, gs.player.y, angle, gs)?;
 
             // Calculate fog percent (0-1.0)
-            let perc_fog = ray_hit.dst / map_max_len;
+            let perc_fog = ray_hit.dst / gs.player.visibility;
 
-            let Some(texture) = &textures.get_tile(htile) else {
+            let Some(texture) = textures.get_tile(htile) else {
                 bail!("No texture for hit tile {htile:?}")
             };
             // Closer means smaller c and thus large ht.
@@ -488,6 +413,11 @@ impl Screen {
 
             // Store distance to know what to occlude from fov
             self.depth_buffer[col_x] = ray_hit.dst;
+
+            if ray_hit.dst > gs.player.visibility {
+                continue;
+            }
+            gs.map.visible.insert((htile.x, htile.y));
 
             // Draw texture/tile
             match texture {
@@ -541,7 +471,7 @@ impl Screen {
         Ok(())
     }
 
-    pub fn render(&mut self, gs: &GameState, textures: &Textures) -> eyre::Result<()> {
+    pub fn render(&mut self, gs: &mut GameState, textures: &Textures) -> eyre::Result<()> {
         // Clear buffer
         self.clear();
         // Draw fov for player

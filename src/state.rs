@@ -95,6 +95,7 @@ impl GameState {
             .and_then(|id| self.id_tile_map.get(id))
     }
 
+    #[allow(unused)]
     pub fn get_tiles(&self) -> impl Iterator<Item = (usize, usize, Option<&Tile>)> {
         (0..self.map.h).flat_map(move |y| (0..self.map.w).map(move |x| (x, y, self.get_tile(x, y))))
     }

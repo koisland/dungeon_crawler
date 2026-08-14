@@ -24,6 +24,8 @@ pub struct Player {
     // If turning
     pub turn: TurnState,
     pub turn_speed: f32,
+    // Player visibility. Controls map and draw distance.
+    pub visibility: f32,
 }
 
 impl Player {
@@ -90,6 +92,7 @@ impl Default for Player {
             acc: 0.0,
             turn: TurnState::Stop,
             turn_speed: 0.05,
+            visibility: 5.0,
         }
     }
 }

@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 mod enemy;
 mod map;
 mod player;
+mod ray;
 mod screen;
 mod state;
 mod textures;
@@ -54,21 +55,23 @@ async fn main() -> eyre::Result<()> {
         gs.update_all();
 
         // Render frame
-        screen.render(&gs, &textures)?;
+        screen.render(&mut gs, &textures)?;
 
         // FPS
-        draw_text(
-            format!(
-                "{:.4} s/{:.0} fps",
-                get_frame_time(),
-                1.0 / (get_frame_time() as f32)
-            )
-            .as_str(),
-            0.0,
-            20.0,
-            30.0,
-            GREEN,
-        );
+        if is_key_down(KeyCode::F) {
+            draw_text(
+                format!(
+                    "{:.4} s/{:.0} fps",
+                    get_frame_time(),
+                    1.0 / (get_frame_time() as f32)
+                )
+                .as_str(),
+                0.0,
+                20.0,
+                30.0,
+                GREEN,
+            );
+        }
 
         next_frame().await;
     }

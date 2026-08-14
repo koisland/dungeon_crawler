@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::{
     fs::File,
@@ -19,6 +19,8 @@ pub struct Map {
     pub tiles: FxHashMap<(usize, usize), usize>,
     // Multiple enemies can be on a single tile
     pub enemies: FxHashMap<(usize, usize), Vec<usize>>,
+    /// Seen tiles
+    pub visible: FxHashSet<(usize, usize)>,
 }
 
 impl Map {
