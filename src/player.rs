@@ -1,6 +1,9 @@
 use std::f32::consts::PI;
 
-use crate::map::Map;
+use crate::{
+    map::Map,
+    ray::{cast_ray, CollidableObject, RAY_INC},
+};
 
 const MIN_ACC: f32 = 0.0;
 const MAX_ACC: f32 = 1.0;
@@ -37,29 +40,36 @@ impl Player {
     /// Move player based on [WalkState] and speed. Also checks if in bound.
     pub fn walk(&mut self, map: &Map) {
         let walk_magn = (self.walk as i32) as f32;
+        let angle = match self.walk {
+            WalkState::Forward => self.angle,
+            WalkState::Reverse => self.angle + PI,
+        };
         // Acceleration is a fraction of the maximum walk speed.
         // Input increase/decrease this fraction. No input decreases and clamps at 0.0.
         let walk_speed = self.walk_speed * self.acc;
-        let dt_x = walk_magn * self.angle.cos() * walk_speed;
-        let dt_y = walk_magn * self.angle.sin() * walk_speed;
+        let walk_dst = walk_magn * walk_speed;
 
-        let new_x = self.x + dt_x;
-        let new_y = self.y + dt_y;
-
-        if map.is_in_bounds(new_x as i32, new_y as i32) {
-            // Move if empty space
-            if map.is_empty(new_x as usize, self.y as usize) {
-                self.x = new_x;
+        // Cast ray to check if movement valid
+        // Stop if:
+        // * hit tile
+        // * Or distance traveled by ray is greater than walk distance
+        let ray_hit = cast_ray(self.x, self.y, angle, map, |map, cx, cy, dst| {
+            let exceeds_dst = dst.abs() > walk_dst.abs();
+            let htile = map.get_tile_id(cx as usize, cy as usize);
+            if let Some(htile_id) = htile {
+                return (true, Some(CollidableObject::Tile(*htile_id)));
             }
-            if map.is_empty(self.x as usize, new_y as usize) {
-                self.y = new_y;
-            }
+            if exceeds_dst {
+                return (true, None);
+            };
+            (false, None)
+        });
+        if ray_hit.dst != RAY_INC && ray_hit.obj.is_none() {
+            // eprintln!("{:?}", (self.x, self.y, &ray_hit));
+            // No collision and free to update
+            self.x = ray_hit.cx;
+            self.y = ray_hit.cy;
         }
-    }
-
-    pub fn update(&mut self, map: &Map) {
-        self.turn();
-        self.walk(map);
     }
 
     pub fn accelerate(&mut self, dt: f32) {

@@ -1,5 +1,14 @@
-use crate::{state::GameState, tiles::Tile};
+use crate::map::Map;
 
+pub const RAY_INC: f32 = 0.01;
+
+/// Collidable object ID
+#[derive(Debug)]
+pub enum CollidableObject {
+    Tile(usize),
+}
+
+#[derive(Debug)]
 pub struct RayHit {
     // x coord hit by ray
     pub cx: f32,
@@ -7,6 +16,8 @@ pub struct RayHit {
     pub cy: f32,
     // Distance from player to hit tile
     pub dst: f32,
+    // Object hit by ray
+    pub obj: Option<CollidableObject>,
 }
 
 /// # Drawing a ray.
@@ -33,9 +44,13 @@ pub struct RayHit {
 /// * `y = p_y + c * sin(p_angle)`
 ///
 /// This function returns the distance (length of c) to the endpoint of the ray.
-pub fn cast_ray_to_tile(x: f32, y: f32, ang: f32, gs: &GameState) -> eyre::Result<(&Tile, RayHit)> {
-    // We don't include a limit (20) unlike the src
-    const INC: f32 = 0.01;
+pub fn cast_ray(
+    x: f32,
+    y: f32,
+    ang: f32,
+    map: &Map,
+    f_gs: impl Fn(&Map, f32, f32, f32) -> (bool, Option<CollidableObject>),
+) -> RayHit {
     let mut dst: f32 = 0.0;
     let cos_ang = ang.cos();
     let sin_ang = ang.sin();
@@ -43,11 +58,11 @@ pub fn cast_ray_to_tile(x: f32, y: f32, ang: f32, gs: &GameState) -> eyre::Resul
         let cx = x + dst * cos_ang;
         let cy = y + dst * sin_ang;
 
-        // Out of bounds or hit an object
-        if let Some(htile) = gs.get_tile(cx as usize, cy as usize) {
-            return Ok((htile, RayHit { cx, cy, dst }));
+        let (stop, obj) = f_gs(map, cx, cy, dst);
+        if stop {
+            return RayHit { cx, cy, dst, obj };
         };
 
-        dst += INC
+        dst += RAY_INC
     }
 }

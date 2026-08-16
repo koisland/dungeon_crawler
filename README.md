@@ -20,6 +20,7 @@ cargo run --release
 * [ ] Collision detection
 * [ ] Doors
 * [ ] Directional sprites
+* [ ] Objects
 * [ ] Levels
 * [ ] Items
 

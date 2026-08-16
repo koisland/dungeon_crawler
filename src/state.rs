@@ -88,18 +88,6 @@ impl GameState {
         Ok(game_state)
     }
 
-    pub fn get_tile(&self, x: usize, y: usize) -> Option<&Tile> {
-        self.map
-            .tiles
-            .get(&(x, y))
-            .and_then(|id| self.id_tile_map.get(id))
-    }
-
-    #[allow(unused)]
-    pub fn get_tiles(&self) -> impl Iterator<Item = (usize, usize, Option<&Tile>)> {
-        (0..self.map.h).flat_map(move |y| (0..self.map.w).map(move |x| (x, y, self.get_tile(x, y))))
-    }
-
     pub fn spawn_tile(&mut self, tile: Tile) {
         let tid = self.id_tile_map.len();
         self.map.tiles.insert((tile.x, tile.y), tid);
@@ -142,7 +130,8 @@ impl GameState {
         self.player.accelerate(-0.03);
 
         // Update player position
-        self.player.update(&self.map);
+        self.player.turn();
+        self.player.walk(&self.map);
         // Update enemies
         for enemy in self.id_enemy_map.values_mut() {
             enemy.dst = enemy.dst_from_player(&self.player)

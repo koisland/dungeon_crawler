@@ -4,13 +4,13 @@ use std::{
     path::Path,
 };
 
-use eyre::bail;
+use eyre::{bail, ContextCompat};
 use itertools::Itertools;
 use macroquad::prelude::*;
 
 use crate::{
     enemy::Enemy,
-    ray::cast_ray_to_tile,
+    ray::{cast_ray, CollidableObject, RayHit},
     state::GameState,
     textures::{Texture, Textures},
 };
@@ -141,7 +141,11 @@ impl Screen {
         let rect_h = self.map_buffer.height() / gs.map.h;
 
         for (x, y) in gs.map.visible.iter().cloned() {
-            if let Some(tile) = gs.get_tile(x, y) {
+            if let Some(tile) = gs
+                .map
+                .get_tile_id(x, y)
+                .and_then(|id| gs.id_tile_map.get(id))
+            {
                 // Because each rect is w and h
                 let rect_x = x * rect_w;
                 let rect_y = y * rect_h;
@@ -397,10 +401,30 @@ impl Screen {
             let angle = ray_dir_y.atan2(ray_dir_x);
 
             // Draw floor and ceiling
-            let (htile, ray_hit) = cast_ray_to_tile(gs.player.x, gs.player.y, angle, gs)?;
+            let RayHit { cx, cy, dst, obj } = cast_ray(
+                gs.player.x,
+                gs.player.y,
+                angle,
+                &gs.map,
+                |map, cx, cy, _dst| {
+                    map.get_tile_id(cx as usize, cy as usize)
+                        .cloned()
+                        .map_or_else(
+                            || (false, None),
+                            |id| (true, Some(CollidableObject::Tile(id))),
+                        )
+                },
+            );
+            let htile = match obj {
+                Some(CollidableObject::Tile(id)) => gs
+                    .id_tile_map
+                    .get(&id)
+                    .with_context(|| format!("Tile ID ({id}) not in id tile map."))?,
+                None => unreachable!(),
+            };
 
             // Calculate fog percent (0-1.0)
-            let perc_fog = ray_hit.dst / gs.player.visibility;
+            let perc_fog = dst / gs.player.visibility;
 
             let Some(texture) = textures.get_tile(htile) else {
                 bail!("No texture for hit tile {htile:?}")
@@ -409,12 +433,12 @@ impl Screen {
             // We need to adjust this scaling to avoid fisheye distortion due to the ray hitting at multiple angles
             // See https://gamedev.stackexchange.com/a/97580
             // And https://lodev.org/cgtutor/raycasting.html
-            let col_ht = (h as f32 / (ray_hit.dst * (angle - gs.player.angle).cos())) as usize;
+            let col_ht = (h as f32 / (dst * (angle - gs.player.angle).cos())) as usize;
 
             // Store distance to know what to occlude from fov
-            self.depth_buffer[col_x] = ray_hit.dst;
+            self.depth_buffer[col_x] = dst;
 
-            if ray_hit.dst > gs.player.visibility {
+            if dst > gs.player.visibility {
                 continue;
             }
             gs.map.visible.insert((htile.x, htile.y));
@@ -437,8 +461,8 @@ impl Screen {
                     // ______              ______
                     // |    |            * |    |
                     // |____|              |____|
-                    let hitx = ray_hit.cx - (ray_hit.cx + 0.5).floor();
-                    let hity = ray_hit.cy - (ray_hit.cy + 0.5).floor();
+                    let hitx = cx - (cx + 0.5).floor();
+                    let hity = cy - (cy + 0.5).floor();
                     // Once know part of texture was hit, we can get what part of sprite to render from the size and fraction.
                     let mut x_texcoord = if hity.abs() > hitx.abs() {
                         hity * size

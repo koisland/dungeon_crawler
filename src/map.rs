@@ -62,15 +62,12 @@ impl Map {
         Ok(map)
     }
 
-    // pub fn update_src(x: usize, y: usize, c: char) -> eyre::Result<()> {
-    //     todo!()
-    // }
-
-    pub fn is_in_bounds(&self, x: i32, y: i32) -> bool {
-        x > 0 && x < self.w as i32 && y > 0 && y < self.h as i32
+    pub fn get_tile_id(&self, x: usize, y: usize) -> Option<&usize> {
+        self.tiles.get(&(x, y))
     }
 
-    pub fn is_empty(&self, x: usize, y: usize) -> bool {
-        !self.tiles.contains_key(&(x, y))
+    #[allow(unused)]
+    pub fn get_tile_ids(&self) -> impl Iterator<Item = (usize, usize, Option<&usize>)> {
+        (0..self.h).flat_map(move |y| (0..self.w).map(move |x| (x, y, self.get_tile_id(x, y))))
     }
 }
