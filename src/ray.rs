@@ -48,6 +48,7 @@ pub fn cast_ray(
     x: f32,
     y: f32,
     ang: f32,
+    ray_dst: f32,
     map: &Map,
     f_gs: impl Fn(&Map, f32, f32, f32) -> (bool, Option<CollidableObject>),
 ) -> RayHit {
@@ -63,6 +64,6 @@ pub fn cast_ray(
             return RayHit { cx, cy, dst, obj };
         };
 
-        dst += RAY_INC
+        dst += ray_dst
     }
 }

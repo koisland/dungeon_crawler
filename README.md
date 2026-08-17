@@ -17,7 +17,7 @@ cargo run --release
 * [x] Player acceleration
 * [ ] Weapons
 * [ ] Enemies
-* [ ] Collision detection
+* [x] Collision detection with ray casting
 * [ ] Doors
 * [ ] Directional sprites
 * [ ] Objects

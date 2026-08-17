@@ -10,7 +10,7 @@ use macroquad::prelude::*;
 
 use crate::{
     enemy::Enemy,
-    ray::{cast_ray, CollidableObject, RayHit},
+    ray::{cast_ray, CollidableObject, RayHit, RAY_INC},
     state::GameState,
     textures::{Texture, Textures},
 };
@@ -405,6 +405,7 @@ impl Screen {
                 gs.player.x,
                 gs.player.y,
                 angle,
+                RAY_INC,
                 &gs.map,
                 |map, cx, cy, _dst| {
                     map.get_tile_id(cx as usize, cy as usize)

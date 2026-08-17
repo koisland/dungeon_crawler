@@ -7,6 +7,7 @@ use crate::{
 
 const MIN_ACC: f32 = 0.0;
 const MAX_ACC: f32 = 1.0;
+const WALL_DST_STOP: f32 = RAY_INC * 10.0;
 
 /// Player
 pub struct Player {
@@ -53,11 +54,14 @@ impl Player {
         // Stop if:
         // * hit tile
         // * Or distance traveled by ray is greater than walk distance
-        let ray_hit = cast_ray(self.x, self.y, angle, map, |map, cx, cy, dst| {
+        let ray_hit = cast_ray(self.x, self.y, angle, RAY_INC, map, |map, cx, cy, dst| {
             let exceeds_dst = dst.abs() > walk_dst.abs();
-            let htile = map.get_tile_id(cx as usize, cy as usize);
-            if let Some(htile_id) = htile {
-                return (true, Some(CollidableObject::Tile(*htile_id)));
+            // Check again if something ahead to stop just before.
+            let n_cx = cx + WALL_DST_STOP * angle.cos();
+            let n_cy = cy + WALL_DST_STOP * angle.sin();
+            let n_htile = map.get_tile_id(n_cx as usize, n_cy as usize);
+            if let Some(n_htile_id) = n_htile {
+                return (true, Some(CollidableObject::Tile(*n_htile_id)));
             }
             if exceeds_dst {
                 return (true, None);
@@ -65,7 +69,6 @@ impl Player {
             (false, None)
         });
         if ray_hit.dst != RAY_INC && ray_hit.obj.is_none() {
-            // eprintln!("{:?}", (self.x, self.y, &ray_hit));
             // No collision and free to update
             self.x = ray_hit.cx;
             self.y = ray_hit.cy;
