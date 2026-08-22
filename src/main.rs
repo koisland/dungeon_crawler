@@ -29,7 +29,7 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() -> eyre::Result<()> {
-    let mut gs = GameState::new("data/map.txt", "data/state.tsv")?;
+    let mut gs = GameState::new("data/maps/map_test.txt", "data/state.tsv")?;
     let textures = Textures::new("data/textures.tsv", 32)?;
     let mut screen = Screen::new(WIDTH, HEIGHT, gs.map.w * 10, gs.map.h * 10);
 
