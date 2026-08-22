@@ -4,6 +4,7 @@ import glob
 import argparse
 from typing import TextIO
 from PIL import Image
+from os.path import split, splitext, join, exists
 
 
 SPRITE_SIZE = 32
@@ -29,7 +30,7 @@ def get_name(line: str) -> str | None:
 
 
 def normalize_tile_type(s: str) -> str:
-    s = os.path.split(s)[-1].strip("s")
+    s = split(s)[-1].strip("s")
     if s == "monster":
         s = "enemy"
     return s
@@ -57,7 +58,7 @@ def extract_tiles(
                 idx = 0
                 continue
 
-            outfile = os.path.join(outdir, f"{name}.png")
+            outfile = join(outdir, f"{name}.png")
 
             # left, upper, right, lower
             left = idx * SPRITE_SIZE
@@ -110,7 +111,7 @@ def extract_animations(
                 # Empty image
                 if entropy == 0:
                     break
-                outfile = os.path.join(outdir, f"{name}_{i}.png")
+                outfile = join(outdir, f"{name}_{i}.png")
                 if not dryrun:
                     with open(outfile, "wb") as ofh:
                         sprite.save(ofh)
@@ -120,9 +121,13 @@ def extract_animations(
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-n", "--dryrun", action="store_true")
+    ap.add_argument("-i", "--indir", type=str, default="data/original")
+    ap.add_argument("-d", "--outdir", type=str, default="data")
     ap.add_argument("-o", "--outfile", type=str, default=sys.stdout)
     args = ap.parse_args()
 
+    indir: str = args.indir
+    outdir: str = args.outdir
     outfile: str | TextIO = args.outfile
     dryrun: bool = args.dryrun
     if isinstance(outfile, str):
@@ -130,22 +135,33 @@ def main():
 
     print("#type", "lbl", "state", "src", "src_idx", sep="\t", file=outfile)
 
-    image_paths = glob.glob("data/*.png")
+    image_paths = glob.glob(join(indir, "*.png"))
     for image_path in image_paths:
-        image_type, _ = os.path.splitext(image_path)
-        key_path = f"{image_type}.txt"
-        if not os.path.exists(key_path):
+        _, image_fname = split(image_path)
+        image_type, _ = splitext(image_fname)
+        key_path = join(indir, f"{image_type}.txt")
+        if not exists(key_path):
             continue
         img = Image.open(image_path)
         is_animation = "animated-tiles" in image_type
-        outdir = f"{image_type}_tiles"
+        image_type_outdir = join(outdir, f"{image_type}_tiles")
         if is_animation:
             extract_animations(
-                img, image_type, key_path, outdir, outfile_tsv=outfile, dryrun=dryrun
+                img,
+                image_type,
+                key_path,
+                image_type_outdir,
+                outfile_tsv=outfile,
+                dryrun=dryrun,
             )
         else:
             extract_tiles(
-                img, image_type, key_path, outdir, outfile_tsv=outfile, dryrun=dryrun
+                img,
+                image_type,
+                key_path,
+                image_type_outdir,
+                outfile_tsv=outfile,
+                dryrun=dryrun,
             )
 
     outfile.close()
