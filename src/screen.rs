@@ -296,16 +296,6 @@ impl Screen {
         Ok(())
     }
 
-    // pub fn draw_floor_ceiling(
-    //     &mut self,
-
-    //     gs: &GameState,
-    //     textures: &Textures,
-    // ) -> eyre::Result<()> {
-
-    //     Ok(())
-    // }
-
     /// # Generate the field-of-view of the player
     /// ```no_run
     ///    ------
@@ -493,6 +483,10 @@ impl Screen {
                 }
             }
         }
+        Ok(())
+    }
+
+    pub fn draw_weapon(&mut self, gs: &mut GameState, textures: &Textures) -> eyre::Result<()> {
         Ok(())
     }
 

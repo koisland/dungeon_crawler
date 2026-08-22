@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 use crate::{
     map::Map,
     ray::{cast_ray, CollidableObject, RAY_INC},
+    weapon::{MeleeWeapon, Weapon},
 };
 
 const MIN_ACC: f32 = 0.0;
@@ -23,13 +24,15 @@ pub struct Player {
     /// If walking
     pub walk: WalkState,
     pub walk_speed: f32,
-    // Acceleration between (0.0 - 1.0)
+    /// Acceleration between (0.0 - 1.0)
     pub acc: f32,
-    // If turning
+    /// If turning
     pub turn: TurnState,
     pub turn_speed: f32,
-    // Player visibility. Controls map and draw distance.
+    /// Player visibility. Controls map and draw distance.
     pub visibility: f32,
+    /// Player weapon
+    pub weapon: Weapon,
 }
 
 impl Player {
@@ -75,6 +78,8 @@ impl Player {
         }
     }
 
+    pub fn attack(&mut self, map: &Map) {}
+
     pub fn accelerate(&mut self, dt: f32) {
         self.acc = (self.acc + dt).clamp(MIN_ACC, MAX_ACC)
     }
@@ -106,6 +111,7 @@ impl Default for Player {
             turn: TurnState::Stop,
             turn_speed: 0.05,
             visibility: 5.0,
+            weapon: Weapon::Melee(MeleeWeapon::Fist),
         }
     }
 }

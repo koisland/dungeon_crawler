@@ -69,6 +69,8 @@ pub struct Enemy {
     pub typ: EnemyType,
     /// Distance from player
     pub dst: f32,
+    /// Health
+    pub health: usize,
 }
 
 impl Enemy {

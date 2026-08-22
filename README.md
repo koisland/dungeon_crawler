@@ -15,9 +15,9 @@ cargo run --release
 * [x] Extend by also doing floor and ceiling.
 * [x] Fog
 * [x] Player acceleration
-* [ ] Weapons
-* [ ] Enemies
 * [x] Collision detection with ray casting
+* [ ] Enemies
+* [ ] Weapons
 * [ ] Doors
 * [ ] Directional sprites
 * [ ] Objects

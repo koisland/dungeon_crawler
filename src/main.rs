@@ -9,6 +9,7 @@ mod screen;
 mod state;
 mod textures;
 mod tiles;
+mod weapon;
 
 use crate::{screen::Screen, state::GameState, textures::Textures};
 

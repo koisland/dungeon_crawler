@@ -62,6 +62,7 @@ impl GameState {
                         state,
                         typ: etyp,
                         dst: 0.0,
+                        health: 100,
                     };
                     game_state.spawn_enemy(enemy);
                 }
