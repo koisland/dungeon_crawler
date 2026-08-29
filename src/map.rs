@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::{
@@ -7,7 +8,7 @@ use std::{
 
 use crate::{
     state::GameState,
-    tiles::{Tile, TileState, TileType},
+    tiles::{Tile, TileState},
 };
 
 #[derive(Default)]
@@ -30,35 +31,31 @@ impl Map {
 
         let mut map_w: usize = 0;
         let mut map_h: usize = 0;
-        for (h, line) in fh.lines().enumerate() {
+        for line in fh.lines() {
             let line = line?;
             let line = line.trim();
-            let w = line.len();
 
-            // Add tiles as entities
-            for (x, tile) in line.chars().enumerate() {
-                let Ok(tile_typ) = TryInto::<TileType>::try_into(tile) else {
-                    continue;
-                };
-                let tile = Tile {
-                    x,
-                    y: h,
-                    state: TileState::Base,
-                    typ: tile_typ,
-                };
+            let Some((x, y, lbl, _icon)) = line.split('\t').collect_tuple() else {
+                continue;
+            };
+            let x = x.parse()?;
+            let y = y.parse()?;
+            let tile = Tile {
+                x,
+                y,
+                lbl: lbl.to_owned(),
+                state: TileState::Base,
+            };
+            let eid = state.id_tile_map.len();
+            map.tiles.insert((x, y), eid);
+            state.id_tile_map.insert(eid, tile);
 
-                let eid = state.id_tile_map.len();
-                map.tiles.insert((x, h), eid);
-                state.id_tile_map.insert(eid, tile);
-            }
-
-            map_w = w;
-            // 0-index
-            map_h = h + 1;
+            map_w = std::cmp::max(map_w, x);
+            map_h = std::cmp::max(map_h, y);
         }
 
-        map.w = map_w;
-        map.h = map_h;
+        map.w = map_w + 1;
+        map.h = map_h + 1;
         Ok(map)
     }
 

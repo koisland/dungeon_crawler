@@ -16,7 +16,7 @@ use macroquad::{
 
 use crate::{
     enemy::{Enemy, EnemyState, EnemyType},
-    tiles::{Tile, TileState, TileType},
+    tiles::{Tile, TileState},
 };
 
 #[derive(Debug, Clone)]
@@ -44,7 +44,7 @@ pub struct Textures {
     // Ceiling texture
     pub ceiling: Texture,
     // Textures mapped to map tiles and state
-    pub tiles: HashMap<TileType, HashMap<TileState, Texture>>,
+    pub tiles: HashMap<String, HashMap<TileState, Texture>>,
     // Textures mapped to map entities and state
     pub entities: HashMap<EnemyType, HashMap<EnemyState, Texture>>,
 }
@@ -58,7 +58,7 @@ impl Textures {
 
     pub fn get_tile(&self, tile: &Tile) -> Option<&Texture> {
         self.tiles
-            .get(&tile.typ)
+            .get(&tile.lbl)
             .and_then(|tilestates| tilestates.get(&tile.state))
     }
 
@@ -130,15 +130,15 @@ impl Textures {
 
             match typ {
                 "tile" => {
-                    let tiletype: TileType = TileType::from_str(lbl)?;
                     let texture_state = TileState::from_str(state)?;
 
-                    if let Some(tile_src) = textures.tiles.get_mut(&tiletype) {
+                    if let Some(tile_src) = textures.tiles.get_mut(lbl) {
                         tile_src.insert(texture_state, texture);
                     } else {
-                        textures
-                            .tiles
-                            .insert(tiletype, HashMap::from_iter([(texture_state, texture)]));
+                        textures.tiles.insert(
+                            lbl.to_owned(),
+                            HashMap::from_iter([(texture_state, texture)]),
+                        );
                     }
                 }
                 "enemy" => {
