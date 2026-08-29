@@ -8,7 +8,7 @@ use crate::{
 
 const MIN_ACC: f32 = 0.0;
 const MAX_ACC: f32 = 1.0;
-const WALL_DST_STOP: f32 = RAY_INC * 10.0;
+const WALL_DST_STOP: f32 = RAY_INC * 30.0;
 
 /// Player
 pub struct Player {
@@ -35,6 +35,28 @@ pub struct Player {
     pub weapon: Weapon,
 }
 
+fn check_valid_movement(
+    map: &Map,
+    cx: f32,
+    cy: f32,
+    dst: f32,
+    walk_dst: f32,
+    angle: f32,
+) -> (bool, Option<CollidableObject>) {
+    let exceeds_dst = dst.abs() > walk_dst.abs();
+    // Check again if something ahead to stop just before.
+    let n_cx = cx + WALL_DST_STOP * angle.cos();
+    let n_cy = cy + WALL_DST_STOP * angle.sin();
+    let n_htile = map.get_tile_id(n_cx as usize, n_cy as usize);
+    if let Some(n_htile_id) = n_htile {
+        return (true, Some(CollidableObject::Tile(*n_htile_id)));
+    }
+    if exceeds_dst {
+        return (true, None);
+    };
+    (false, None)
+}
+
 impl Player {
     /// Turn player adjusting angle based on [TurnState] and speed.
     pub fn turn(&mut self) {
@@ -53,25 +75,25 @@ impl Player {
         let walk_speed = self.walk_speed * self.acc;
         let walk_dst = walk_magn * walk_speed;
 
-        // Cast ray to check if movement valid
+        // Cast ray in front and at 45 degree angle to check if movement valid
         // Stop if:
         // * hit tile
         // * Or distance traveled by ray is greater than walk distance
         let ray_hit = cast_ray(self.x, self.y, angle, RAY_INC, map, |map, cx, cy, dst| {
-            let exceeds_dst = dst.abs() > walk_dst.abs();
-            // Check again if something ahead to stop just before.
-            let n_cx = cx + WALL_DST_STOP * angle.cos();
-            let n_cy = cy + WALL_DST_STOP * angle.sin();
-            let n_htile = map.get_tile_id(n_cx as usize, n_cy as usize);
-            if let Some(n_htile_id) = n_htile {
-                return (true, Some(CollidableObject::Tile(*n_htile_id)));
-            }
-            if exceeds_dst {
-                return (true, None);
-            };
-            (false, None)
+            check_valid_movement(map, cx, cy, dst, walk_dst, angle)
         });
-        if ray_hit.dst != RAY_INC && ray_hit.obj.is_none() {
+        let front_check = ray_hit.dst != RAY_INC && ray_hit.obj.is_none();
+        let side_angle = PI / 4.0;
+        let side_check = [angle + side_angle, angle - side_angle]
+            .iter()
+            .all(|angle| {
+                let ray_hit = cast_ray(self.x, self.y, *angle, RAY_INC, map, |map, cx, cy, dst| {
+                    check_valid_movement(map, cx, cy, dst, walk_dst, *angle)
+                });
+                ray_hit.dst != RAY_INC && ray_hit.obj.is_none()
+            });
+
+        if front_check && side_check {
             // No collision and free to update
             self.x = ray_hit.cx;
             self.y = ray_hit.cy;
