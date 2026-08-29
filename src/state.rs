@@ -9,7 +9,7 @@ use crate::{
     enemy::{Enemy, EnemyState, EnemyType},
     map::Map,
     player::{Player, TurnState, WalkState},
-    tiles::{Tile, TileState, TileType},
+    tiles::{Tile, TileState},
 };
 use eyre::bail;
 use itertools::Itertools;
@@ -67,14 +67,13 @@ impl GameState {
                     game_state.spawn_enemy(enemy);
                 }
                 "tile" => {
-                    let tiletype = TileType::from_str(lbl)?;
                     let state = TileState::from_str(state)?;
 
                     let tile = Tile {
                         x: x as usize,
                         y: y as usize,
                         state,
-                        typ: tiletype,
+                        lbl: lbl.to_owned(),
                     };
                     game_state.spawn_tile(tile);
                 }
