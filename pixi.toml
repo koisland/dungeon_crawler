@@ -6,7 +6,7 @@ platforms = ["win-64", "linux-64"]
 version = "0.1.0"
 
 [tasks]
-images = "python data/split_images.py > data/textures_extracted.tsv"
+images = "python data/split_images.py"
 clean_images = "rm -rf ./data/*_tiles"
 
 [dependencies]

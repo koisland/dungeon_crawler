@@ -142,7 +142,10 @@ impl Textures {
                     }
                 }
                 "enemy" => {
-                    let enemy: EnemyType = EnemyType::from_str(lbl)?;
+                    let Ok(enemy) = EnemyType::from_str(lbl) else {
+                        eprintln!("Skipping unknown enemy {lbl}");
+                        continue;
+                    };
                     let texture_state = EnemyState::from_str(state)?;
                     if let Some(ety_src) = textures.entities.get_mut(&enemy) {
                         ety_src.insert(texture_state, texture);
@@ -158,7 +161,9 @@ impl Textures {
                 "ceiling" => {
                     textures.ceiling = texture;
                 }
-                _ => bail!("Invalid type. {typ}"),
+                _ => {
+                    eprintln!("Skipping invalid type. {typ}")
+                }
             };
         }
 

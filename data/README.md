@@ -7,7 +7,8 @@ pixi install
 
 ### Split images
 ```bash
-pixi run images
+pixi run images > data/textures.tsv
+cat data/textures_floor_ceiling.tsv >> data/textures.tsv
 ```
 
 ### Cleanup images
