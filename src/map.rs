@@ -31,7 +31,7 @@ impl Map {
 
         let mut map_w: usize = 0;
         let mut map_h: usize = 0;
-        for (h, line) in fh.lines().enumerate() {
+        for line in fh.lines() {
             let line = line?;
             let line = line.trim();
 
@@ -47,7 +47,7 @@ impl Map {
                 state: TileState::Base,
             };
             let eid = state.id_tile_map.len();
-            map.tiles.insert((x, h), eid);
+            map.tiles.insert((x, y), eid);
             state.id_tile_map.insert(eid, tile);
 
             map_w = std::cmp::max(map_w, x);
