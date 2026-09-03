@@ -15,8 +15,7 @@ use macroquad::{
 };
 
 use crate::{
-    enemy::{Enemy, EnemyState, EnemyType},
-    tiles::{Tile, TileState},
+    enemy::{Enemy, EnemyState, EnemyType}, tiles::{Tile, TileState}, weapon::{MeleeWeapon, ProjectileWeapon},
 };
 
 #[derive(Debug, Clone)]
@@ -37,16 +36,22 @@ impl Texture {
 
 #[derive(Debug, Clone)]
 pub struct Textures {
-    // Size of texture square length and width.
+    /// Size of texture square length and width.
     pub size: usize,
-    // Floor texture
+    /// Floor texture
     pub floor: Texture,
-    // Ceiling texture
+    /// Ceiling texture
     pub ceiling: Texture,
-    // Textures mapped to map tiles and state
+    /// Textures mapped to map tiles and state
     pub tiles: HashMap<String, HashMap<TileState, Texture>>,
-    // Textures mapped to map entities and state
+    /// Textures mapped to map entities and state
     pub entities: HashMap<EnemyType, HashMap<EnemyState, Texture>>,
+    /// Items
+    pub items: HashMap<String, Texture>,
+    /// Weapons
+    pub weapons: HashMap<String, Texture>,
+    /// Armor
+    pub armor: HashMap<String, Texture>
 }
 
 impl Textures {
@@ -69,6 +74,9 @@ impl Textures {
             ceiling: Texture::Color(GRAY),
             tiles: HashMap::new(),
             entities: HashMap::new(),
+            items: HashMap::new(),
+            weapons: HashMap::new(),
+            armor: HashMap::new(),
         };
         let fh = BufReader::new(File::open(infile)?);
         let mut texture_cache = HashMap::new();
@@ -155,6 +163,14 @@ impl Textures {
                             .insert(enemy, HashMap::from_iter([(texture_state, texture)]));
                     }
                 }
+                "item" => {
+                    if MeleeWeapon::from_str(lbl).is_ok() || ProjectileWeapon::from_str(lbl).is_ok(){
+                        textures.weapons.insert(lbl.to_owned(), texture);
+                    } else {
+                        eprintln!("Skipping unknown item, {lbl}");
+                        continue;
+                    }
+                },
                 "floor" => {
                     textures.floor = texture;
                 }

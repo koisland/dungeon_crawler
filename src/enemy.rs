@@ -1,10 +1,11 @@
 use std::str::FromStr;
 
 use eyre::bail;
+use strum_macros::IntoStaticStr;
 
 use crate::player::Player;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, IntoStaticStr)]
 pub enum EnemyType {
     Orc,
     ImpDevil,
@@ -24,8 +25,8 @@ impl FromStr for EnemyType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "orc" => EnemyType::Orc,
-            "imp_devil" => EnemyType::ImpDevil,
+            "Orc" => EnemyType::Orc,
+            "ImpDevil" => EnemyType::ImpDevil,
             _ => bail!("Invalid string for enemy type {s}"),
         })
     }

@@ -18,14 +18,18 @@ def get_name(line: str) -> str | None:
         _, _, name = line.split(".")
     except ValueError:
         _, name = line.split(".")
-
-    return (
+    name_elems = (
         name.strip()
         .replace(" ", "_")
         .replace("(", "")
         .replace(")", "")
         .replace("/", "")
         .replace("__", "_")
+        .split("_")
+    )
+    return "".join(
+        elem.capitalize()
+        for elem in name_elems
     )
 
 

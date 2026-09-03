@@ -4,7 +4,9 @@
 use std::str::FromStr;
 
 use eyre::bail;
+use strum_macros::IntoStaticStr;
 
+#[derive(IntoStaticStr)]
 pub enum MeleeWeapon {
     Fist,
     GreatClub,
@@ -15,13 +17,14 @@ impl FromStr for MeleeWeapon {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "fist" => MeleeWeapon::Fist,
-            "great_club" => MeleeWeapon::GreatClub,
+            "Fist" => MeleeWeapon::Fist,
+            "GreatClub" => MeleeWeapon::GreatClub,
             _ => bail!("Invalid melee weapon: {s}"),
         })
     }
 }
 
+#[derive(IntoStaticStr)]
 pub enum ProjectileWeapon {
     CrystalStaff,
 }
@@ -31,7 +34,7 @@ impl FromStr for ProjectileWeapon {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "crystal_staff" => ProjectileWeapon::CrystalStaff,
+            "CrystalStaff" => ProjectileWeapon::CrystalStaff,
             _ => bail!("Invalid projectile weapon: {s}"),
         })
     }
@@ -42,4 +45,11 @@ pub enum Weapon {
     Projectile(ProjectileWeapon),
 }
 
-impl Weapon {}
+impl Weapon {
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            Weapon::Melee(melee_weapon) => melee_weapon.into(),
+            Weapon::Projectile(projectile_weapon) => projectile_weapon.into(),
+        }
+    }
+}

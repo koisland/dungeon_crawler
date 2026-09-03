@@ -486,7 +486,34 @@ impl Screen {
         Ok(())
     }
 
-    pub fn draw_weapon(&mut self, gs: &mut GameState, textures: &Textures) -> eyre::Result<()> {
+    pub fn draw_player_weapon(
+        &mut self,
+        gs: &mut GameState,
+        textures: &Textures,
+    ) -> eyre::Result<()> {
+        let weapon_name = gs.player.weapon.as_str();
+        let weapon_texture = textures.weapons.get(weapon_name);
+        if let Some(Texture::Sprite(image)) = weapon_texture {
+            let image = nearest_neighbor(image, 300, 300);
+            let w = self.buffer.width();
+            let h = self.buffer.height();
+            let x = w - image.width();
+            let y = h - image.height();
+            let (img_w, img_h) = (image.width(), image.height());
+            for i in 0..img_w {
+                for j in 0..img_h {
+                    let cx = x + i;
+                    let cy = y + j;
+                    if cx > w || cy > h {
+                        continue;
+                    }
+                    let px = image.get_pixel(i as u32, j as u32);
+                    if px.a > 0.5 {
+                        draw_pixel(&mut self.buffer, cx, cy, px)
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -497,6 +524,8 @@ impl Screen {
         self.draw_fov(gs, textures)?;
         // And draw sprites
         self.draw_sprites(gs, textures)?;
+        // Then draw player weapon
+        self.draw_player_weapon(gs, textures)?;
 
         // Then update
         self.texture.update(&self.buffer);
@@ -506,8 +535,8 @@ impl Screen {
         self.draw_map(gs, textures)?;
         self.map_texture.update(&self.map_buffer);
         let map_x = self.buffer.width() - self.map_buffer.width();
-        let map_y = self.buffer.height() - self.map_buffer.height();
-        draw_texture(&self.map_texture, map_x as f32, map_y as f32, GRAY);
+        // let map_y = self.map_buffer.height();
+        draw_texture(&self.map_texture, map_x as f32, 0., GRAY);
 
         Ok(())
     }

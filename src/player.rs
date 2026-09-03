@@ -133,7 +133,8 @@ impl Default for Player {
             turn: TurnState::Stop,
             turn_speed: 0.05,
             visibility: 5.0,
-            weapon: Weapon::Melee(MeleeWeapon::Fist),
+            // TODO: Change to fist
+            weapon: Weapon::Melee(MeleeWeapon::GreatClub),
         }
     }
 }
